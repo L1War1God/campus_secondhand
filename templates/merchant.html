@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商家店铺 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container" id="merchantPage" data-merchant-id="{{ merchant_id | tojson }}">
+        <div class="page-header">
+            <h2 class="section-title">🏪 商家店铺</h2>
+            <p class="page-subtitle" id="merchantSubtitle">加载中...</p>
+        </div>
+
+        <div class="product-detail-container">
+            <div class="detail-section">
+                <h4>商家信息</h4>
+                <div id="merchantInfo">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-header">
+            <h2 class="section-title">📦 在售商品</h2>
+            <span class="results-count" id="resultsCount">共 0 件商品</span>
+        </div>
+
+        <div id="productList" class="product-grid">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function getConditionText(condition) {
+            const map = { 'new': '全新', 'like_new': '99新', 'good': '良好', 'fair': '一般' };
+            return map[condition] || condition;
+        }
+
+        async function toggleFavorite(productId, button) {
+            const user = getCurrentUser();
+            if (!user) {
+                if (confirm('请先登录,是否前往登录页?')) {
+                    window.location.href = '/page/login';
+                }
+                return;
+            }
+
+            const result = await apiPost('/favorite', {
+                user_id: user.id,
+                product_id: productId
+            });
+
+            if (result.code === 200) {
+                showMessage('已收藏');
+                updateFavoriteCache(user.id, productId, true);
+                setFavoriteButtonState(button, true);
+            } else if (result.code === 400 && result.message === '已收藏') {
+                const unfavResult = await apiDelete(`/favorite/${productId}?user_id=${user.id}`);
+                if (unfavResult.code === 200) {
+                    showMessage('已取消收藏');
+                    updateFavoriteCache(user.id, productId, false);
+                    setFavoriteButtonState(button, false);
+                } else {
+                    showMessage(unfavResult.message || '操作失败', 'error');
+                }
+            } else {
+                showMessage(result.message || '操作失败', 'error');
+            }
+        }
+
+        function renderMerchant(merchant) {
+            const subtitle = document.getElementById('merchantSubtitle');
+            subtitle.textContent = merchant && merchant.username
+                ? `@${merchant.username}${merchant.real_name ? ` · ${merchant.real_name}` : ''}`
+                : '';
+
+            const container = document.getElementById('merchantInfo');
+            if (!container) return;
+
+            if (!merchant) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><h3>商家不存在</h3></div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="user-card">
+                    <div class="avatar-wrapper">
+                        <div class="avatar">
+                            <span class="avatar-icon">🏪</span>
+                        </div>
+                    </div>
+                    <div class="user-name">${escapeHtml(merchant.username ? `@${merchant.username}` : '商家')}</div>
+                    <div class="user-role">${escapeHtml(merchant.real_name ? `实名：${merchant.real_name}` : '未填写实名')}</div>
+                </div>
+
+                <div class="settings-list">
+                    <div class="settings-item">
+                        <span class="settings-icon">📍</span>
+                        <div class="settings-info">
+                            <h4>地址</h4>
+                            <p>${escapeHtml(merchant.address || '未填写')}</p>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span class="settings-icon">📞</span>
+                        <div class="settings-info">
+                            <h4>手机</h4>
+                            <p>${escapeHtml(merchant.phone || '未填写')}</p>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span class="settings-icon">✉️</span>
+                        <div class="settings-info">
+                            <h4>邮箱</h4>
+                            <p>${escapeHtml(merchant.email || '未填写')}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderProducts(products, total = null) {
+            const container = document.getElementById('productList');
+            const countEl = document.getElementById('resultsCount');
+
+            const count = Number.isFinite(Number(total)) ? Number(total) : (products ? products.length : 0);
+            if (countEl) countEl.textContent = `共 ${count} 件商品`;
+
+            if (!container) return;
+
+            if (!products || products.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>暂无在售商品</h3><p>该商家暂时没有上架商品</p></div>';
+                return;
+            }
+
+            container.innerHTML = products.map(product => {
+                const image = product.images && product.images.length > 0 ? encodeURI(product.images[0]) : null;
+                const imageHtml = image
+                    ? `<img src="${image}" alt="${escapeHtml(product.title)}" class="product-img">`
+                    : `<div class="product-no-image">📷</div>`;
+
+                const originalPrice = product.original_price
+                    ? `<span class="product-original-price">¥${product.original_price}</span>`
+                    : '';
+
+                return `
+                    <div class="product-card">
+                        <button class="product-favorite-btn" data-product-id="${product.id}" onclick="toggleFavorite(${product.id}, this)" title="收藏">
+                            <span>❤️</span>
+                        </button>
+                        <a href="/page/product/${product.id}" class="product-image-link">
+                            <div class="product-image">${imageHtml}</div>
+                        </a>
+                        <div class="product-info">
+                            <h3 class="product-title"><a href="/page/product/${product.id}">${escapeHtml(product.title)}</a></h3>
+                            <div class="product-price">
+                                <span class="current-price">¥${product.price}</span>
+                                ${originalPrice}
+                            </div>
+                            <p class="product-desc">${escapeHtml(product.description || '')}</p>
+                            <div class="product-meta">
+                                <span>👁️ ${product.views || 0}</span>
+                                <span>📅 ${getConditionText(product.condition)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            syncFavoriteButtons(container);
+        }
+
+        async function loadMerchantPage() {
+            const pageEl = document.getElementById('merchantPage');
+            const merchantId = pageEl ? Number(pageEl.dataset.merchantId) : NaN;
+
+            if (!Number.isFinite(merchantId) || merchantId <= 0) {
+                renderMerchant(null);
+                renderProducts([]);
+                return;
+            }
+
+            const [merchantResult, productResult] = await Promise.all([
+                apiGet(`/user/${merchantId}`),
+                apiGet(`/products/search?user_id=${merchantId}&page=1&per_page=50`)
+            ]);
+
+            if (merchantResult.code === 200) {
+                renderMerchant(merchantResult.data);
+            } else {
+                renderMerchant(null);
+            }
+
+            if (productResult.code === 200) {
+                renderProducts(productResult.data || [], productResult.total);
+            } else {
+                renderProducts([]);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadMerchantPage();
+        });
+    </script>
+</body>
+
+</html>

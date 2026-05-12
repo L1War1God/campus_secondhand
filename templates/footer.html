@@ -1,0 +1,87 @@
+<!-- 公共底部 -->
+<footer style="background: #333; color: white; text-align: center; padding: 20px; margin-top: 40px;">
+    <div class="container">
+        <p>&copy; 2026 校园二手交易平台 - 让闲置流动起来</p>
+    </div>
+</footer>
+
+<div id="floatCartBtn" class="float-cart-btn" onclick="goToCart()">
+    <span class="float-cart-icon">🛒</span>
+    <span id="floatCartBadge" class="float-cart-badge">0</span>
+</div>
+
+<script>
+    function updateFloatCartBadge(count) {
+        const badge = document.getElementById('floatCartBadge');
+        if (badge) {
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'flex' : 'none';
+        }
+    }
+
+    function goToCart() {
+        window.location.href = '/page/cart';
+    }
+
+    async function updateCartBadge() {
+        const user = getCurrentUser();
+        if (!user) {
+            updateFloatCartBadge(0);
+            return;
+        }
+
+        const result = await apiGet('/cart?user_id=' + user.id);
+        if (result.code === 200) {
+            updateFloatCartBadge(result.data.length);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCartBadge();
+    });
+</script>
+
+<style>
+    .float-cart-btn {
+        position: fixed;
+        right: 30px;
+        bottom: 100px;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        z-index: 999;
+    }
+
+    .float-cart-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+    }
+
+    .float-cart-icon {
+        font-size: 28px;
+    }
+
+    .float-cart-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 22px;
+        height: 22px;
+        background: #f5576c;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 11px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+    }
+</style>

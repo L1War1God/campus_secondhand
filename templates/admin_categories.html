@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分类管理 - 后台管理</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .admin-page {
+            padding: 32px 0 60px;
+        }
+
+        .admin-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .admin-card h2,
+        .admin-card h3 {
+            margin: 0 0 16px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .admin-table th,
+        .admin-table td {
+            border-bottom: 1px solid #eee;
+            padding: 12px 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .admin-table th {
+            background: #fafafa;
+            font-weight: 600;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .admin-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        @media (max-width: 960px) {
+            .admin-form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container admin-page">
+        <div class="admin-card">
+            <h2>分类管理</h2>
+            <p>在这里可以完成分类新增、修改、删除操作。</p>
+        </div>
+
+        <div class="admin-card">
+            <h3 id="categoryFormTitle">新增分类</h3>
+            <form id="categoryForm">
+                <input type="hidden" id="editCategoryId">
+                <div class="admin-form-grid">
+                    <div class="form-group full">
+                        <label>分类名称 *</label>
+                        <input type="text" id="categoryName" class="form-control" required>
+                    </div>
+                    <div class="form-group full">
+                        <label>上级分类</label>
+                        <select id="categoryParentId" class="form-control">
+                            <option value="0">顶级分类</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>排序</label>
+                        <input type="number" id="categorySortOrder" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>状态</label>
+                        <select id="categoryStatus" class="form-control">
+                            <option value="1">启用</option>
+                            <option value="0">停用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <button type="submit" class="form-btn">保存分类</button>
+                    <button type="button" class="form-btn" onclick="resetCategoryForm()">重置</button>
+                    <button type="button" class="form-btn" onclick="location.href='/page/admin'">返回管理首页</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="admin-card">
+            <h3>分类列表</h3>
+            <div class="table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>名称</th>
+                            <th>上级</th>
+                            <th>排序</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoryTableBody">
+                        <tr><td colspan="6">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+            alert('请先登录');
+            window.location.href = '/page/login';
+        }
+        
+        // 确保只有管理员才能访问
+        if (currentUser.role !== 'admin') {
+            alert('您没有管理员权限');
+            window.location.href = '/page/index';
+        }
+
+        let categoryCache = [];
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            await loadCategories();
+        });
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function buildParentOptions(categories) {
+            // 显示所有分类，包括子分类，便于正确设置层级关系
+            let options = '<option value="0">顶级分类</option>';
+            
+            // 按层级排序显示
+            const categoryMap = new Map(categories.map(cat => [cat.id, cat]));
+            const roots = categories.filter(cat => cat.parent_id === 0);
+            
+            function addCategoryOptions(category, depth = 0) {
+                const prefix = depth > 0 ? '　'.repeat(depth) + '├ ' : '';
+                options += `<option value="${category.id}">${prefix}${escapeHtml(category.name)}</option>`;
+                
+                // 添加该分类的所有子分类
+                const children = categories.filter(cat => cat.parent_id === category.id);
+                children.forEach(child => {
+                    addCategoryOptions(child, depth + 1);
+                });
+            }
+            
+            roots.forEach(root => {
+                addCategoryOptions(root, 0);
+            });
+            
+            return options;
+        }
+
+        async function loadCategories() {
+            const result = await apiGet('/admin/categories');
+            if (result.code !== 200) {
+                document.getElementById('categoryTableBody').innerHTML = '<tr><td colspan="6">分类加载失败</td></tr>';
+                return;
+            }
+
+            categoryCache = result.data || [];
+            const map = new Map(categoryCache.map(cat => [cat.id, cat]));
+
+            const parentSelect = document.getElementById('categoryParentId');
+            parentSelect.innerHTML = buildParentOptions(categoryCache);
+
+            const body = document.getElementById('categoryTableBody');
+            if (categoryCache.length === 0) {
+                body.innerHTML = '<tr><td colspan="6">暂无分类</td></tr>';
+                return;
+            }
+
+            body.innerHTML = categoryCache.map(category => {
+                const parent = category.parent_id ? map.get(category.parent_id) : null;
+                const statusText = category.status === 1 ? '启用' : '停用';
+                return `
+                    <tr>
+                        <td>${category.id}</td>
+                        <td>${escapeHtml(category.name)}</td>
+                        <td>${parent ? escapeHtml(parent.name) : '顶级分类'}</td>
+                        <td>${category.sort_order}</td>
+                        <td>${statusText}</td>
+                        <td>
+                            <div class="action-group">
+                                <button type="button" class="pagination-btn" onclick="editCategory(${category.id})">编辑</button>
+                                <button type="button" class="pagination-btn" onclick="deleteCategory(${category.id})">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function resetCategoryForm() {
+            document.getElementById('editCategoryId').value = '';
+            document.getElementById('categoryForm').reset();
+            document.getElementById('categoryParentId').value = '0';
+            document.getElementById('categorySortOrder').value = 0;
+            document.getElementById('categoryStatus').value = 1;
+        }
+
+        async function editCategory(id) {
+            const category = categoryCache.find(item => item.id === id);
+            if (!category) return;
+            document.getElementById('editCategoryId').value = category.id;
+            document.getElementById('categoryName').value = category.name || '';
+            document.getElementById('categoryParentId').value = category.parent_id || 0;
+            document.getElementById('categorySortOrder').value = category.sort_order ?? 0;
+            document.getElementById('categoryStatus').value = category.status ?? 1;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('确定要删除这个分类吗？')) return;
+            const result = await apiDelete(`/category/${id}`);
+            if (result.code === 200) {
+                showMessage('分类已删除');
+                await loadCategories();
+            } else {
+                showMessage(result.message || '删除失败', 'error');
+            }
+        }
+
+        document.getElementById('categoryForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const editId = document.getElementById('editCategoryId').value;
+            const payload = {
+                name: document.getElementById('categoryName').value.trim(),
+                parent_id: parseInt(document.getElementById('categoryParentId').value, 10) || 0,
+                sort_order: parseInt(document.getElementById('categorySortOrder').value, 10) || 0,
+                status: parseInt(document.getElementById('categoryStatus').value, 10) || 0
+            };
+
+            if (!payload.name) {
+                showMessage('分类名称不能为空', 'error');
+                return;
+            }
+
+            const result = editId ? await apiPut(`/category/${editId}`, payload) : await apiPost('/category', payload);
+            if (result.code === 200) {
+                showMessage(editId ? '分类更新成功' : '分类创建成功');
+                resetCategoryForm();
+                await loadCategories();
+            } else {
+                showMessage(result.message || '保存失败', 'error');
+            }
+        });
+    </script>
+</body>
+
+</html>

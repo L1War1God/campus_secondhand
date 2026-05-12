@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 后台管理</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .admin-page {
+            padding: 32px 0 60px;
+        }
+
+        .admin-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .admin-card h2,
+        .admin-card h3 {
+            margin: 0 0 16px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .admin-table th,
+        .admin-table td {
+            border-bottom: 1px solid #eee;
+            padding: 12px 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .admin-table th {
+            background: #fafafa;
+            font-weight: 600;
+        }
+
+        .status-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            font-size: 12px;
+        }
+
+        .status-active { background: #e8f5e9; color: #2e7d32; }
+        .status-frozen { background: #ffebee; color: #c62828; }
+        .status-deleted { background: #e0e0e0; color: #616161; }
+
+        .role-tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #e3f2fd;
+            font-size: 12px;
+            color: #1976d2;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 960px) {
+            .toolbar input,
+            .toolbar select {
+                min-width: 140px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container admin-page">
+        <div class="admin-card">
+            <h2>用户管理</h2>
+            <p>在这里可以完成普通账户的删除、冻结、解冻操作。</p>
+        </div>
+
+        <div class="admin-card">
+            <h3>用户列表</h3>
+            <div class="toolbar">
+                <input type="text" id="userKeyword" class="form-control" placeholder="搜索用户名/姓名/学号">
+                <select id="userStatusFilter" class="form-control">
+                    <option value="">全部状态</option>
+                    <option value="active">正常</option>
+                    <option value="frozen">已冻结</option>
+                </select>
+                <button type="button" class="form-btn" onclick="loadUsers()">筛选</button>
+            </div>
+            <div class="table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户名</th>
+                            <th>真实姓名</th>
+                            <th>学号</th>
+                            <th>角色</th>
+                            <th>状态</th>
+                            <th>注册时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        <tr><td colspan="8">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+            alert('请先登录');
+            window.location.href = '/page/login';
+        }
+        
+        // 确保只有管理员才能访问
+        if (currentUser.role !== 'admin') {
+            alert('您没有管理员权限');
+            window.location.href = '/page/index';
+        }
+
+        let userCache = [];
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            await loadUsers();
+        });
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadUsers() {
+            const keyword = document.getElementById('userKeyword').value.trim();
+            const status = document.getElementById('userStatusFilter').value;
+            const params = new URLSearchParams();
+            params.set('page', '1');
+            params.set('per_page', '100');
+            if (keyword) params.set('keyword', keyword);
+            if (status) params.set('status', status);
+
+            const result = await apiGet(`/admin/users?${params.toString()}`);
+            const body = document.getElementById('userTableBody');
+            if (result.code !== 200) {
+                body.innerHTML = '<tr><td colspan="8">用户加载失败</td></tr>';
+                return;
+            }
+
+            const users = result.data || [];
+            userCache = users;
+            if (users.length === 0) {
+                body.innerHTML = '<tr><td colspan="8">暂无用户</td></tr>';
+                return;
+            }
+
+            body.innerHTML = users.map(user => {
+                const statusText = user.status === 'active' ? '正常' : '已冻结';
+                const roleText = user.role === 'admin' ? '管理员' : '普通用户';
+                return `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${escapeHtml(user.username)}</td>
+                        <td>${escapeHtml(user.real_name || '--')}</td>
+                        <td>${escapeHtml(user.student_id || '--')}</td>
+                        <td><span class="role-tag">${escapeHtml(roleText)}</span></td>
+                        <td><span class="status-tag status-${user.status}">${escapeHtml(statusText)}</span></td>
+                        <td>${user.created_at || '--'}</td>
+                        <td>
+                            <div class="action-group">
+                                ${user.role !== 'admin' ? `
+                                    ${user.status === 'active' ? `
+                                        <button type="button" class="pagination-btn" onclick="freezeUser(${user.id})">冻结</button>
+                                        <button type="button" class="pagination-btn" onclick="deleteUser(${user.id})">删除</button>
+                                    ` : ''}
+                                    ${user.status === 'frozen' ? `
+                                        <button type="button" class="pagination-btn" onclick="unfreezeUser(${user.id})">解冻</button>
+                                        <button type="button" class="pagination-btn" onclick="deleteUser(${user.id})">删除</button>
+                                    ` : ''}
+                                ` : `
+                                    <span style="color: #999;">管理员</span>
+                                `}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function freezeUser(id) {
+            if (!confirm('确定要冻结这个用户账户吗？')) return;
+            const result = await apiPut(`/admin/user/${id}/freeze`);
+            if (result.code === 200) {
+                showMessage('用户账户已冻结');
+                loadUsers();
+            } else {
+                showMessage(result.message || '冻结失败', 'error');
+            }
+        }
+
+        async function unfreezeUser(id) {
+            if (!confirm('确定要解冻这个用户账户吗？')) return;
+            const result = await apiPut(`/admin/user/${id}/unfreeze`);
+            if (result.code === 200) {
+                showMessage('用户账户已解冻');
+                loadUsers();
+            } else {
+                showMessage(result.message || '解冻失败', 'error');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('确定要永久删除这个用户账户吗？删除后无法恢复！')) return;
+            const result = await apiDelete(`/admin/user/${id}`);
+            if (result.code === 200) {
+                showMessage('用户账户已删除');
+                loadUsers();
+            } else {
+                showMessage(result.message || '删除失败', 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

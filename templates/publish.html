@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>发布商品 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container">
+        <div class="form-container" style="max-width: 700px;">
+            <h2 class="form-title">发布商品</h2>
+            <form id="publishForm">
+                <!-- 图片上传 -->
+                <div class="form-group">
+                    <label>商品图片</label>
+                    <div class="image-upload-area" id="imageUploadArea">
+                        <div class="upload-placeholder" onclick="document.getElementById('imageInput').click()">
+                            <span class="upload-icon">📷</span>
+                            <span class="upload-text">点击上传图片</span>
+                            <span class="upload-hint">支持 JPG、PNG 格式</span>
+                        </div>
+                        <input type="file" id="imageInput" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(this)">
+                    </div>
+                    <div class="image-preview-list" id="imagePreviewList"></div>
+                    <input type="hidden" id="imageUrls" value="">
+                </div>
+
+                <div class="form-group">
+                    <label>商品标题 *</label>
+                    <input type="text" id="title" class="form-control" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>价格 *</label>
+                        <input type="number" step="0.01" id="price" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>原价</label>
+                        <input type="number" step="0.01" id="originalPrice" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>库存 *</label>
+                        <input type="number" id="stock" class="form-control" min="0" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>分类</label>
+                        <select id="categoryId" class="form-control">
+                            <option value="">请选择分类</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>商品成色</label>
+                        <select id="condition" class="form-control">
+                            <option value="new">全新</option>
+                            <option value="like_new">99成新</option>
+                            <option value="good">良好</option>
+                            <option value="fair">一般</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>商品描述</label>
+                    <textarea id="description" rows="5" class="form-control"
+                        placeholder="详细描述商品的使用情况、购买时间等..."></textarea>
+                </div>
+                <div id="errorMsg" class="error-msg" style="display: none;"></div>
+                <button type="submit" class="form-btn">发布商品</button>
+            </form>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        // 检查登录
+        const user = getCurrentUser();
+        if (!user) {
+            alert('请先登录');
+            window.location.href = '/page/login';
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const editProductId = urlParams.get('edit');
+        const isEditMode = !!editProductId;
+        const uploadedImages = [];
+
+        if (isEditMode) {
+            document.querySelector('.form-title').textContent = '编辑商品';
+            document.querySelector('.form-btn').textContent = '保存修改';
+        }
+
+        // 图片上传处理
+        function handleImageUpload(input) {
+            const files = input.files;
+            if (files.length === 0) return;
+
+            // 限制最多5张图片
+            if (uploadedImages.length + files.length > 5) {
+                showMessage('最多只能上传5张图片');
+                return;
+            }
+
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) {
+                    showMessage('请上传图片文件');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageData = e.target.result;
+                    uploadedImages.push(imageData);
+                    renderImagePreviews();
+                };
+                reader.readAsDataURL(file);
+            });
+
+            input.value = '';
+        }
+
+        function renderImagePreviews() {
+            const container = document.getElementById('imagePreviewList');
+            const uploadArea = document.getElementById('imageUploadArea');
+
+            if (uploadedImages.length === 0) {
+                uploadArea.style.display = 'block';
+                container.innerHTML = '';
+                return;
+            }
+
+            // 如果已有5张图片，隐藏上传区域
+            uploadArea.style.display = uploadedImages.length >= 5 ? 'none' : 'block';
+
+            container.innerHTML = uploadedImages.map((img, index) => `
+                <div class="image-preview-item">
+                    <img src="${img}" alt="商品图片${index + 1}">
+                    <button type="button" class="image-remove-btn" onclick="removeImage(${index})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            renderImagePreviews();
+        }
+
+        function normalizeImageList(images) {
+            if (!images) return [];
+            if (Array.isArray(images)) return images.filter(Boolean);
+            if (typeof images === 'string') {
+                const raw = images.trim();
+                if (!raw) return [];
+                if (raw.startsWith('[')) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+                    } catch (e) {
+                        return [raw];
+                    }
+                }
+                if (raw.includes('|||')) return raw.split('|||').map(item => item.trim()).filter(Boolean);
+                if (raw.includes(',')) return raw.split(',').map(item => item.trim()).filter(Boolean);
+                return [raw];
+            }
+            return [];
+        }
+
+        // 加载分类
+        async function loadCategories() {
+            const result = await apiGet('/categories');
+            if (result.code === 200) {
+                const select = document.getElementById('categoryId');
+                result.data.forEach(cat => {
+                    select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+                    if (cat.children) {
+                        cat.children.forEach(sub => {
+                            select.innerHTML += `<option value="${sub.id}">　├ ${sub.name}</option>`;
+                        });
+                    }
+                });
+            }
+        }
+
+        async function loadProductForEdit() {
+            if (!isEditMode) return;
+
+            const result = await apiGet(`/product/${editProductId}`);
+            if (result.code !== 200) {
+                showMessage(result.message || '加载商品失败', 'error');
+                setTimeout(() => {
+                    window.location.href = '/page/profile';
+                }, 1200);
+                return;
+            }
+
+            const product = result.data;
+            document.getElementById('title').value = product.title || '';
+            document.getElementById('price').value = product.price ?? '';
+            document.getElementById('originalPrice').value = product.original_price ?? '';
+            document.getElementById('stock').value = product.stock ?? 0;
+            document.getElementById('categoryId').value = product.category_id || '';
+            document.getElementById('condition').value = product.condition || 'good';
+            document.getElementById('description').value = product.description || '';
+
+            uploadedImages.splice(0, uploadedImages.length, ...normalizeImageList(product.images));
+            renderImagePreviews();
+        }
+
+        // 发布商品
+        document.getElementById('publishForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const title = document.getElementById('title').value;
+            const price = parseFloat(document.getElementById('price').value);
+            const originalPrice = document.getElementById('originalPrice').value;
+            const stock = parseInt(document.getElementById('stock').value, 10);
+            const categoryId = document.getElementById('categoryId').value;
+            const condition = document.getElementById('condition').value;
+            const description = document.getElementById('description').value;
+            const errorMsg = document.getElementById('errorMsg');
+
+            errorMsg.style.display = 'none';
+
+            if (!title || !price) {
+                errorMsg.textContent = '请填写标题和价格';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (price <= 0) {
+                errorMsg.textContent = '价格必须大于0';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (Number.isNaN(stock) || stock < 0) {
+                errorMsg.textContent = '请填写正确的库存数量';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            const payload = {
+                user_id: user.id,
+                title,
+                price,
+                original_price: originalPrice ? parseFloat(originalPrice) : null,
+                stock,
+                category_id: categoryId ? parseInt(categoryId) : null,
+                condition,
+                description,
+                images: uploadedImages
+            };
+
+            const result = isEditMode
+                ? await apiPut(`/product/${editProductId}`, payload)
+                : await apiPost('/product', payload);
+
+            if (result.code === 200) {
+                showMessage(isEditMode ? '商品修改成功!' : '商品发布成功!');
+                setTimeout(() => {
+                    window.location.href = isEditMode ? '/page/profile#products' : '/page/index';
+                }, 1000);
+            } else {
+                errorMsg.textContent = result.message;
+                errorMsg.style.display = 'block';
+            }
+        });
+
+        (async function init() {
+            await loadCategories();
+            await loadProductForEdit();
+        })();
+    </script>
+
+    <style>
+        .image-upload-area {
+            border: 2px dashed #e0e0e0;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .image-upload-area:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
+        }
+
+        .upload-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            opacity: 0.6;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .image-preview-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-remove-btn:hover {
+            background: rgba(245, 87, 108, 0.9);
+        }
+    </style>
+</body>
+
+</html>

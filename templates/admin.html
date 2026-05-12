@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .admin-page {
+            padding: 32px 0 60px;
+        }
+
+        .admin-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .admin-option-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+            padding: 32px;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .admin-option-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .admin-option-card h3 {
+            margin: 16px 0 12px;
+            color: #333;
+        }
+
+        .admin-option-card p {
+            color: #666;
+            margin: 0 0 20px;
+            line-height: 1.5;
+        }
+
+        .option-icon {
+            width: 64px;
+            height: 64px;
+            background: #f8f9fa;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+            color: #4a6cf7;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container admin-page">
+        <div class="admin-card">
+            <h2>后台管理</h2>
+            <p>请选择要管理的功能模块</p>
+        </div>
+
+        <div class="admin-options">
+            <div class="admin-option-card" onclick="location.href='/page/admin/products'">
+                <div class="option-icon">📦</div>
+                <h3>商品管理</h3>
+                <p>商品新增、修改、删除</p>
+            </div>
+            
+            <div class="admin-option-card" onclick="location.href='/page/admin/categories'">
+                <div class="option-icon">📁</div>
+                <h3>分类管理</h3>
+                <p>分类新增、修改、删除</p>
+            </div>
+            
+            <div class="admin-option-card" onclick="location.href='/page/admin/users'">
+                <div class="option-icon">👥</div>
+                <h3>用户管理</h3>
+                <p>普通账户删除、冻结、解冻</p>
+            </div>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+            alert('请先登录');
+            window.location.href = '/page/login';
+        }
+        
+        // 确保只有管理员才能访问
+        if (currentUser.role !== 'admin') {
+            alert('您没有管理员权限');
+            window.location.href = '/page/index';
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品详情 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <!-- 使用 data 属性存储商品 ID,避免 VSCode 误报 -->
+    <div class="container" id="productDetail" data-product-id="{{ product_id | tojson }}">
+        <div class="loading">加载中...</div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        // 从 data 属性中获取商品 ID
+        const productContainer = document.getElementById('productDetail');
+        // 从URL路径获取商品ID（格式：/page/product/123）
+        function getProductIdFromUrl() {
+            const path = window.location.pathname;
+            const match = path.match(/\/page\/product\/(\d+)/);
+            return match ? match[1] : null;
+        }
+
+        const productId = getProductIdFromUrl();
+
+        async function loadProduct() {
+            if (!productId) {
+                document.getElementById('productDetail').innerHTML = '<div class="empty-state">商品不存在</div>';
+                return;
+            }
+
+            const result = await apiGet(`/product/${productId}`);
+            if (result.code === 200) {
+                renderProduct(result.data);
+                loadMerchantInfo(result.data.user_id);
+            } else {
+                document.getElementById('productDetail').innerHTML = '<div class="empty-state">商品不存在或已下架</div>';
+            }
+        }
+
+        function renderProduct(product) {
+            const container = document.getElementById('productDetail');
+
+            // 处理图片（对中文文件名进行URL编码）
+            let images = [];
+            if (product.images && product.images.length > 0) {
+                images = product.images.map(img => encodeURI(img));
+            }
+
+            const mainImage = images[0] || null;
+            const otherImages = images.slice(1);
+
+            // 图片画廊HTML
+            let galleryHtml = '';
+            if (images.length > 0) {
+                galleryHtml = `
+                    <div class="product-gallery">
+                        <div class="main-image-container">
+                            <img src="${mainImage}" alt="${escapeHtml(product.title)}" id="mainImage" class="main-image">
+                        </div>
+                        ${otherImages.length > 0 ? `
+                        <div class="thumbnail-list">
+                            ${otherImages.map((img, idx) => `
+                                <img src="${img}" alt="缩略图${idx + 1}" class="thumbnail" onclick="changeMainImage('${img}')">
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                galleryHtml = `
+                    <div class="product-no-image-large">
+                        <span>📷</span>
+                        <span>暂无图片</span>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="product-detail-container">
+                    <div class="product-detail-grid">
+                        <div class="product-images-section">
+                            ${galleryHtml}
+                        </div>
+                        <div class="product-info-section">
+                            <h1 class="product-detail-title">${escapeHtml(product.title)}</h1>
+                            <div class="product-price-detail">
+                                <span class="current-price">¥${product.price}</span>
+                                ${product.original_price ? `<span class="original-price">¥${product.original_price}</span>` : ''}
+                            </div>
+                            <div class="product-meta-detail">
+                                <span>👁️ ${product.views || 0} 次浏览</span>
+                                <span>📦 ${getConditionText(product.condition)}</span>
+                                <span>📅 ${getStatusText(product.status)}</span>
+                                <span>🧮 库存 ${product.stock ?? 0}</span>
+                            </div>
+                            <div class="product-description-section">
+                                <h3>商品描述</h3>
+                                <p>${escapeHtml(product.description || '暂无描述')}</p>
+                            </div>
+
+                            <div class="product-description-section">
+                                <h3>商家信息</h3>
+                                <div id="merchantInfo">
+                                    <div class="loading">加载中...</div>
+                                </div>
+                            </div>
+
+                            <div class="product-quantity-section">
+                                <label>购买数量：</label>
+                                <div class="quantity-control">
+                                    <button class="quantity-btn" onclick="decreaseQuantity()">-</button>
+                                    <input type="number" id="buyQuantity" value="1" min="1" max="${Math.max(1, product.stock || 1)}" readonly>
+                                    <button class="quantity-btn" onclick="increaseQuantity()">+</button>
+                                </div>
+                            </div>
+                            <div class="product-actions">
+                                <button class="btn btn-lg btn-primary" onclick="buyNow(${product.id})">立即购买</button>
+                                <button class="btn btn-lg btn-outline" onclick="addToCart(${product.id})">加入购物车</button>
+                                <button class="btn btn-lg btn-heart" id="favoriteBtn" data-product-id="${product.id}" onclick="toggleFavorite(${product.id}, this)" title="收藏">
+                                    <span>❤️</span>
+                                    <span class="favorite-text">收藏</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function changeMainImage(src) {
+            document.getElementById('mainImage').src = src;
+        }
+
+        function getConditionText(condition) {
+            const map = { 'new': '全新', 'like_new': '99新', 'good': '良好', 'fair': '一般' };
+            return map[condition] || condition;
+        }
+
+        function getStatusText(status) {
+            const map = { 'on_sale': '出售中', 'sold_out': '已售出', 'off_sale': '已下架' };
+            return map[status] || status;
+        }
+
+        function decreaseQuantity() {
+            const input = document.getElementById('buyQuantity');
+            let value = parseInt(input.value);
+            if (value > 1) {
+                input.value = value - 1;
+            }
+        }
+
+        function increaseQuantity() {
+            const input = document.getElementById('buyQuantity');
+            const maxValue = parseInt(input.max, 10) || 1;
+            let value = parseInt(input.value);
+            if (value < maxValue) {
+                input.value = value + 1;
+            }
+        }
+
+        async function buyNow(productId) {
+            const user = getCurrentUser();
+            if (!user) {
+                if (confirm('请先登录,是否前往登录页?')) {
+                    window.location.href = '/page/login';
+                }
+                return;
+            }
+
+            const quantity = parseInt(document.getElementById('buyQuantity').value) || 1;
+
+            const result = await apiPost('/order', {
+                user_id: user.id,
+                product_id: productId,
+                quantity: quantity
+            });
+
+            if (result.code === 200) {
+                showMessage('订单创建成功');
+                setTimeout(() => {
+                    window.location.href = '/page/orders';
+                }, 1500);
+            } else {
+                showMessage(result.message || '下单失败', 'error');
+            }
+        }
+
+        async function addToCart(productId) {
+            const user = getCurrentUser();
+            if (!user) {
+                if (confirm('请先登录,是否前往登录页?')) {
+                    window.location.href = '/page/login';
+                }
+                return;
+            }
+
+            const result = await apiPost('/cart', {
+                user_id: user.id,
+                product_id: productId,
+                quantity: 1
+            });
+
+            if (result.code === 200) {
+                showMessage('已添加到购物车');
+            } else {
+                showMessage(result.message || '添加失败', 'error');
+            }
+        }
+
+        // 收藏/取消收藏
+        async function toggleFavorite(productId, button) {
+            const user = getCurrentUser();
+            if (!user) {
+                if (confirm('请先登录,是否前往登录页?')) {
+                    window.location.href = '/page/login';
+                }
+                return;
+            }
+
+            const result = await apiPost('/favorite', {
+                user_id: user.id,
+                product_id: productId
+            });
+
+            if (result.code === 200) {
+                showMessage('已收藏');
+                updateFavoriteCache(user.id, productId, true);
+                setFavoriteButtonState(button, true);
+            } else if (result.code === 400 && result.message === '已收藏') {
+                const unfavResult = await apiDelete(`/favorite/${productId}?user_id=${user.id}`);
+                if (unfavResult.code === 200) {
+                    showMessage('已取消收藏');
+                    updateFavoriteCache(user.id, productId, false);
+                    setFavoriteButtonState(button, false);
+                } else {
+                    showMessage(unfavResult.message || '操作失败', 'error');
+                }
+            } else {
+                showMessage(result.message || '操作失败', 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadMerchantInfo(merchantId) {
+            const container = document.getElementById('merchantInfo');
+            if (!container) return;
+
+            if (!merchantId) {
+                container.innerHTML = `
+                    <div class="settings-list">
+                        <div class="settings-item">
+                            <span class="settings-icon">🏪</span>
+                            <div class="settings-info">
+                                <h4>商家信息</h4>
+                                <p>未知</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const result = await apiGet(`/user/${merchantId}`);
+            if (result.code === 200) {
+                const merchant = result.data || {};
+                const usernameText = merchant.username ? `@${merchant.username}` : '商家';
+                const displayName = merchant.real_name ? `${usernameText}（${merchant.real_name}）` : usernameText;
+                container.innerHTML = `
+                    <div class="settings-list">
+                        <div class="settings-item">
+                            <span class="settings-icon">🏪</span>
+                            <div class="settings-info">
+                                <h4>${escapeHtml(displayName)}</h4>
+                                <p>${escapeHtml(merchant.address || '未填写')}</p>
+                            </div>
+                            <a class="btn btn-outline btn-sm" href="/page/merchant/${merchant.id}">进入店铺</a>
+                        </div>
+                        <div class="settings-item">
+                            <span class="settings-icon">📞</span>
+                            <div class="settings-info">
+                                <h4>联系电话</h4>
+                                <p>${escapeHtml(merchant.phone || '未填写')}</p>
+                            </div>
+                        </div>
+                        <div class="settings-item">
+                            <span class="settings-icon">✉️</span>
+                            <div class="settings-info">
+                                <h4>邮箱</h4>
+                                <p>${escapeHtml(merchant.email || '未填写')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="settings-list">
+                        <div class="settings-item">
+                            <span class="settings-icon">🏪</span>
+                            <div class="settings-info">
+                                <h4>商家信息</h4>
+                                <p>${escapeHtml(result.message || '加载失败')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        loadProduct().then(() => syncFavoriteButtons(document.getElementById('productDetail')));
+    </script>
+</body>
+
+</html>

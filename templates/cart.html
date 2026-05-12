@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购物车 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="page-content">
+        <div class="container">
+            <div class="cart-page-header">
+                <h1 class="cart-page-title">
+                    <span class="cart-icon">🛒</span>
+                    我的购物车
+                </h1>
+            </div>
+            <div id="cartContent">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="floatCartBtn" class="float-cart-btn" onclick="goToCart()">
+        <span class="float-cart-icon">🛒</span>
+        <span id="floatCartBadge" class="float-cart-badge">0</span>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        let cartItems = [];
+        let totalPrice = 0;
+
+        async function loadCart() {
+            const user = getCurrentUser();
+            if (!user) {
+                document.getElementById('cartContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔒</div>
+                        <h3>登录后查看购物车</h3>
+                        <p>登录后将同步您的购物车商品</p>
+                        <a href="/page/login" class="btn btn-primary btn-lg">
+                            <span>立即登录</span>
+                        </a>
+                    </div>
+                `;
+                updateFloatCartBadge(0);
+                return;
+            }
+
+            const result = await apiGet(`/cart?user_id=${user.id}`);
+            if (result.code === 200) {
+                cartItems = result.data;
+                totalPrice = result.total_price || 0;
+                renderCart(cartItems, totalPrice);
+                updateFloatCartBadge(cartItems.length);
+            } else {
+                document.getElementById('cartContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">😢</div>
+                        <h3>加载失败</h3>
+                        <p>${result.message || '请稍后重试'}</p>
+                        <button class="btn btn-primary" onclick="loadCart()">
+                            <span>重新加载</span>
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderCart(items, totalPrice) {
+            const container = document.getElementById('cartContent');
+
+            if (!items || items.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🛒</div>
+                        <h3>购物车是空的</h3>
+                        <p>快去挑选心仪的商品吧~</p>
+                        <a href="/page/index" class="btn btn-primary btn-lg">
+                            <span>去逛逛</span>
+                        </a>
+                    </div>
+                `;
+                updateFloatCartBadge(0);
+                return;
+            }
+
+            const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+            const uniqueItems = items.length;
+
+            container.innerHTML = `
+                <div class="cart-wrapper">
+                    <div class="cart-main">
+                        <div class="cart-list-header">
+                            <label class="select-all-label">
+                                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" checked>
+                                <span>全选</span>
+                            </label>
+                            <span class="header-info">商品信息</span>
+                            <span class="header-price">单价</span>
+                            <span class="header-quantity">数量</span>
+                            <span class="header-total">小计</span>
+                            <span class="header-action">操作</span>
+                        </div>
+                        <div class="cart-list">
+                            ${items.map((item, index) => `
+                                <div class="cart-item" data-id="${item.id}">
+                                    <div class="item-select">
+                                        <input type="checkbox" class="item-checkbox" checked onchange="updateSelection()">
+                                    </div>
+                                    <div class="item-image">
+                                        <a href="/page/product/${item.product_id}">
+                                            ${item.image
+                                                ? `<img src="${encodeURI(item.image)}" alt="${escapeHtml(item.title)}">`
+                                                : `<div class="cart-product-no-image" aria-label="暂无图片">📷</div>`
+                                            }
+                                        </a>
+                                    </div>
+                                    <div class="item-info">
+                                        <a href="/page/product/${item.product_id}" class="item-title">${escapeHtml(item.title)}</a>
+                                        <div class="item-meta">
+                                            ${item.condition ? `<span class="item-tag">${getConditionText(item.condition)}</span>` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="item-price">
+                                        <span class="price-current">¥${item.price}</span>
+                                    </div>
+                                    <div class="item-quantity">
+                                        <div class="quantity-control">
+                                            <button class="qty-btn qty-minus" onclick="updateQuantity(${item.id}, ${item.quantity - 1})">
+                                                <span>-</span>
+                                            </button>
+                                            <input type="number" class="qty-input" value="${item.quantity}" min="1" max="99" onchange="changeQuantityInput(${item.id}, this.value)">
+                                            <button class="qty-btn qty-plus" onclick="updateQuantity(${item.id}, ${item.quantity + 1})">
+                                                <span>+</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="item-total">
+                                        <span class="total-price">¥${item.total.toFixed(2)}</span>
+                                    </div>
+                                    <div class="item-action">
+                                        <button class="btn-icon btn-favorite" onclick="addToFavorite(${item.product_id})" title="移入收藏">
+                                            <span>❤️</span>
+                                        </button>
+                                        <button class="btn-icon btn-delete" onclick="removeItem(${item.id})" title="删除">
+                                            <span>🗑️</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="cart-list-footer">
+                            <button class="btn btn-text btn-clear" onclick="clearSelected()">
+                                <span>清空购物车</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cart-sidebar">
+                        <div class="cart-summary-card">
+                            <h3 class="summary-title">订单摘要</h3>
+                            <div class="summary-stats">
+                                <div class="stat-row">
+                                    <span class="stat-label">商品件数</span>
+                                    <span class="stat-value" id="totalItems">${totalItems} 件</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">商品种类</span>
+                                    <span class="stat-value" id="uniqueItems">${uniqueItems} 件</span>
+                                </div>
+                            </div>
+                            <div class="summary-divider"></div>
+                            <div class="summary-total-row">
+                                <span class="total-label">合计</span>
+                                <span class="total-amount" id="totalPrice">¥${totalPrice.toFixed(2)}</span>
+                            </div>
+                            <button class="btn btn-primary btn-block btn-checkout" onclick="checkout()">
+                                <span>去结算</span>
+                                <span class="checkout-count">(${totalItems})</span>
+                            </button>
+                        </div>
+                        <div class="cart-tips">
+                            <div class="tip-item">
+                                <span class="tip-icon">💡</span>
+                                <span>温馨提示：请在下单后尽快完成支付</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateFloatCartBadge(count) {
+            const badge = document.getElementById('floatCartBadge');
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'flex' : 'none';
+            }
+        }
+
+        function goToCart() {
+            window.location.href = '/page/cart';
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateSelection();
+        }
+
+        function updateSelection() {
+            const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+            const allBoxes = document.querySelectorAll('.item-checkbox');
+            const selectAll = document.getElementById('selectAll');
+
+            if (selectAll) {
+                selectAll.checked = checkedBoxes.length === allBoxes.length;
+            }
+
+            let selectedTotal = 0;
+            let selectedCount = 0;
+
+            checkedBoxes.forEach(cb => {
+                const item = cb.closest('.cart-item');
+                const quantity = parseInt(item.querySelector('.qty-input').value);
+                const price = parseFloat(item.querySelector('.price-current').textContent.replace('¥', ''));
+                selectedTotal += price * quantity;
+                selectedCount += quantity;
+            });
+
+            document.getElementById('totalPrice').textContent = '¥' + selectedTotal.toFixed(2);
+            document.getElementById('totalItems').textContent = selectedCount + ' 件';
+
+            const checkoutBtn = document.querySelector('.btn-checkout');
+            if (checkoutBtn) {
+                checkoutBtn.querySelector('.checkout-count').textContent = '(' + selectedCount + ')';
+            }
+        }
+
+        async function updateQuantity(cartId, newQuantity) {
+            if (newQuantity < 1) {
+                if (confirm('确定要删除这个商品吗？')) {
+                    removeItem(cartId);
+                }
+                return;
+            }
+
+            const result = await apiPut(`/cart/${cartId}`, { quantity: newQuantity });
+            if (result.code === 200) {
+                loadCart();
+            } else {
+                showMessage(result.message || '更新失败', 'error');
+            }
+        }
+
+        function changeQuantityInput(cartId, value) {
+            const newQuantity = parseInt(value) || 1;
+            updateQuantity(cartId, Math.max(1, Math.min(99, newQuantity)));
+        }
+
+        async function removeItem(cartId) {
+            const result = await apiDelete(`/cart/${cartId}`);
+            if (result.code === 200) {
+                showMessage('已删除');
+                loadCart();
+            } else {
+                showMessage(result.message || '删除失败', 'error');
+            }
+        }
+
+        async function clearSelected() {
+            if (!confirm('确定要清空购物车吗？')) return;
+
+            const user = getCurrentUser();
+            if (!user) return;
+
+            let success = true;
+            for (const item of cartItems) {
+                const result = await apiDelete(`/cart/${item.id}`);
+                if (result.code !== 200) {
+                    success = false;
+                }
+            }
+
+            if (success) {
+                showMessage('购物车已清空');
+                loadCart();
+            } else {
+                showMessage('部分商品删除失败', 'error');
+                loadCart();
+            }
+        }
+
+        async function addToFavorite(productId) {
+            const user = getCurrentUser();
+            if (!user) {
+                if (confirm('请先登录,是否前往登录页?')) {
+                    window.location.href = '/page/login';
+                }
+                return;
+            }
+
+            const result = await apiPost('/favorite', {
+                user_id: user.id,
+                product_id: productId
+            });
+
+            if (result.code === 200) {
+                showMessage('已添加到收藏');
+            } else if (result.code === 400 && result.message === '已收藏') {
+                showMessage('已在收藏夹中');
+            } else {
+                showMessage(result.message || '添加失败', 'error');
+            }
+        }
+
+        async function checkout() {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                showMessage('请选择要结算的商品', 'error');
+                return;
+            }
+
+            const selectedIds = [];
+            checkedBoxes.forEach(cb => {
+                const item = cb.closest('.cart-item');
+                selectedIds.push(parseInt(item.dataset.id));
+            });
+
+            const cartIds = selectedIds;
+            const result = await apiPost('/order', {
+                user_id: user.id,
+                cart_ids: cartIds
+            });
+
+            if (result.code === 200) {
+                showMessage('订单创建成功');
+                setTimeout(() => {
+                    window.location.href = '/page/orders';
+                }, 1500);
+            } else {
+                showMessage(result.message || '下单失败', 'error');
+            }
+        }
+
+        function getConditionText(condition) {
+            const map = { 'new': '全新', 'like_new': '99新', 'good': '良好', 'fair': '一般' };
+            return map[condition] || condition;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadCart();
+        });
+    </script>
+
+    <style>
+        .page-content {
+            min-height: calc(100vh - 200px);
+            padding: 30px 0;
+            background: linear-gradient(180deg, #f8f9fc 0%, #fff 100%);
+        }
+
+        .cart-page-header {
+            margin-bottom: 30px;
+        }
+
+        .cart-page-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1a1a2e;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cart-icon {
+            font-size: 32px;
+        }
+
+        .cart-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .cart-main {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        .cart-list-header {
+            display: grid;
+            grid-template-columns: 50px 100px 1fr 100px 120px 90px 80px;
+            gap: 15px;
+            align-items: center;
+            padding: 16px 20px;
+            background: #f8f9fc;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .select-all-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .select-all-label input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .header-info {
+            text-align: left;
+        }
+
+        .header-price {
+            text-align: center;
+        }
+
+        .header-quantity {
+            text-align: center;
+        }
+
+        .header-total {
+            text-align: center;
+        }
+
+        .header-action {
+            text-align: center;
+        }
+
+        .cart-item {
+            display: grid;
+            grid-template-columns: 50px 100px 1fr 100px 120px 90px 80px;
+            gap: 15px;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .cart-item:hover {
+            background: #fafafa;
+        }
+
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-select {
+            display: flex;
+            justify-content: center;
+        }
+
+        .item-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .item-image {
+            width: 100px;
+            height: 100px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .item-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .cart-product-no-image {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+            color: #999;
+            font-size: 32px;
+        }
+
+        .item-image:hover img {
+            transform: scale(1.05);
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .item-title {
+            font-size: 15px;
+            color: #1a1a2e;
+            font-weight: 500;
+            text-decoration: none;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            transition: color 0.2s;
+        }
+
+        .item-title:hover {
+            color: #667eea;
+        }
+
+        .item-meta {
+            display: flex;
+            gap: 8px;
+        }
+
+        .item-tag {
+            font-size: 12px;
+            color: #888;
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .item-price {
+            text-align: center;
+        }
+
+        .price-current {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        .item-quantity {
+            display: flex;
+            justify-content: center;
+        }
+
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .qty-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f5f5f5;
+            color: #666;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qty-btn:hover {
+            background: #667eea;
+            color: #fff;
+        }
+
+        .qty-input {
+            width: 50px;
+            height: 32px;
+            border: none;
+            border-left: 1px solid #e0e0e0;
+            border-right: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 14px;
+            color: #1a1a2e;
+        }
+
+        .qty-input:focus {
+            outline: none;
+            background: #fff;
+        }
+
+        .item-total {
+            text-align: center;
+        }
+
+        .total-price {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f5576c;
+        }
+
+        .item-action {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-favorite {
+            background: #fff0f0;
+        }
+
+        .btn-favorite:hover {
+            background: #ffe0e0;
+            transform: scale(1.1);
+        }
+
+        .btn-delete {
+            background: #f5f5f5;
+        }
+
+        .btn-delete:hover {
+            background: #ffe0e0;
+            transform: scale(1.1);
+        }
+
+        .cart-list-footer {
+            padding: 16px 20px;
+            background: #f8f9fc;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .btn-text {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .btn-text:hover {
+            color: #f5576c;
+        }
+
+        .cart-sidebar {
+            position: sticky;
+            top: 20px;
+        }
+
+        .cart-summary-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            padding: 24px;
+        }
+
+        .summary-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 20px;
+        }
+
+        .summary-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .stat-value {
+            color: #1a1a2e;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .summary-divider {
+            height: 1px;
+            background: #eee;
+            margin: 20px 0;
+        }
+
+        .summary-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .total-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .total-amount {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f5576c;
+        }
+
+        .btn-checkout {
+            height: 50px;
+            font-size: 16px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-checkout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .checkout-count {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .cart-tips {
+            margin-top: 16px;
+        }
+
+        .tip-item {
+            background: #f8f9fc;
+            padding: 12px 16px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .tip-icon {
+            font-size: 16px;
+        }
+
+        .float-cart-btn {
+            position: fixed;
+            right: 30px;
+            bottom: 100px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        .float-cart-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        .float-cart-icon {
+            font-size: 28px;
+        }
+
+        .float-cart-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            min-width: 22px;
+            height: 22px;
+            background: #f5576c;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 11px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 6px;
+        }
+
+        .empty-state {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            padding: 80px 40px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #1a1a2e;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .loading-state {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            padding: 80px 40px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .cart-wrapper {
+                grid-template-columns: 1fr;
+            }
+
+            .cart-sidebar {
+                position: static;
+            }
+
+            .cart-list-header,
+            .cart-item {
+                grid-template-columns: 40px 80px 1fr 80px;
+                gap: 10px;
+            }
+
+            .header-price,
+            .header-total,
+            .header-quantity,
+            .item-price,
+            .item-total,
+            .item-quantity {
+                display: none;
+            }
+
+            .item-action {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .btn-icon {
+                width: 30px;
+                height: 30px;
+            }
+        }
+    </style>
+</body>
+
+</html>

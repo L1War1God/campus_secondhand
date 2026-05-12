@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的订单 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container">
+        <div class="page-header">
+            <h2 class="section-title">📋 我的订单</h2>
+            <p class="page-subtitle">查看和管理您的所有订单</p>
+        </div>
+
+        <div class="order-filter">
+            <div class="filter-group">
+                <button class="filter-btn active" data-status="" onclick="loadOrders('')">
+                    <span class="filter-icon">📦</span>
+                    <span>全部</span>
+                </button>
+                <button class="filter-btn" data-status="pending" onclick="loadOrders('pending')">
+                    <span class="filter-icon">💰</span>
+                    <span>待付款</span>
+                </button>
+                <button class="filter-btn" data-status="paid" onclick="loadOrders('paid')">
+                    <span class="filter-icon">📤</span>
+                    <span>待发货</span>
+                </button>
+                <button class="filter-btn" data-status="shipped" onclick="loadOrders('shipped')">
+                    <span class="filter-icon">📬</span>
+                    <span>待收货</span>
+                </button>
+                <button class="filter-btn" data-status="completed" onclick="loadOrders('completed')">
+                    <span class="filter-icon">✅</span>
+                    <span>已完成</span>
+                </button>
+                <button class="filter-btn" data-status="cancelled" onclick="loadOrders('cancelled')">
+                    <span class="filter-icon">❌</span>
+                    <span>已取消</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="orders-summary">
+            <div class="summary-card">
+                <div class="summary-icon">💰</div>
+                <div class="summary-info">
+                    <div class="summary-value" id="pendingCount">0</div>
+                    <div class="summary-label">待付款</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon">📤</div>
+                <div class="summary-info">
+                    <div class="summary-value" id="paidCount">0</div>
+                    <div class="summary-label">待发货</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon">📬</div>
+                <div class="summary-info">
+                    <div class="summary-value" id="shippedCount">0</div>
+                    <div class="summary-label">待收货</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon">✅</div>
+                <div class="summary-info">
+                    <div class="summary-value" id="completedCount">0</div>
+                    <div class="summary-label">已完成</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="ordersList">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <div id="orderDetailModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>订单详情</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="orderDetailBody">
+            </div>
+        </div>
+    </div>
+
+    <div id="payModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>确认支付</h3>
+                <button class="modal-close" onclick="closePayModal()">✕</button>
+            </div>
+            <div class="modal-body" id="payBody">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        let currentStatus = '';
+        let allOrders = [];
+
+        async function loadOrders(status = '') {
+            currentStatus = status;
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.status === status);
+            });
+
+            const user = getCurrentUser();
+            if (!user) {
+                document.getElementById('ordersList').innerHTML = '<div class="empty-state"><div class="icon">🔒</div><h3>请先登录查看订单</h3><p><a href="/page/login" class="btn btn-primary">立即登录</a></p></div>';
+                return;
+            }
+
+            let url = `/orders?user_id=${user.id}`;
+            if (status) url += `&status=${status}`;
+
+            const result = await apiGet(url);
+            if (result.code === 200) {
+                allOrders = result.data;
+                updateOrderStats(result.data);
+                renderOrders(result.data);
+            } else {
+                document.getElementById('ordersList').innerHTML = '<div class="empty-state"><div class="icon">📦</div><h3>加载失败</h3><p>请稍后重试</p></div>';
+            }
+        }
+
+        function updateOrderStats(orders) {
+            const stats = {
+                pending: 0,
+                paid: 0,
+                shipped: 0,
+                completed: 0,
+                cancelled: 0
+            };
+
+            orders.forEach(order => {
+                if (stats[order.status] !== undefined) {
+                    stats[order.status]++;
+                }
+            });
+
+            document.getElementById('pendingCount').textContent = stats.pending;
+            document.getElementById('paidCount').textContent = stats.paid;
+            document.getElementById('shippedCount').textContent = stats.shipped;
+            document.getElementById('completedCount').textContent = stats.completed;
+        }
+
+        function renderOrders(orders) {
+            const container = document.getElementById('ordersList');
+
+            if (!orders || orders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📦</div>
+                        <h3>暂无订单</h3>
+                        <p>还没有相关订单，快去选购心仪的商品吧！</p>
+                        <p><a href="/page/index" class="btn btn-primary">去购物</a></p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="order-card">
+                    <div class="order-header">
+                        <div class="order-header-left">
+                            <span class="order-no">订单号: ${order.order_no}</span>
+                            <span class="order-date">下单时间: ${order.created_at || ''}</span>
+                        </div>
+                        <span class="order-status status-${order.status}">${getStatusText(order.status)}</span>
+                    </div>
+
+                    <div class="order-body">
+                        <div class="order-product" onclick="viewOrder(${order.id})">
+                            ${order.image ? `<img src="${encodeURI(order.image)}" alt="${escapeHtml(order.product_title)}" class="order-product-image">` : '<div class="order-product-no-image">📷</div>'}
+                            <div class="order-product-info">
+                                <h4>${escapeHtml(order.product_title)}</h4>
+                                <div class="order-product-meta">
+                                    <span>单价: ¥${order.price}</span>
+                                    <span>数量: ${order.quantity}</span>
+                                    <span>商家: ${order.merchant && order.merchant.id ? `<a class="merchant-link" href="/page/merchant/${order.merchant.id}" onclick="event.stopPropagation()">${escapeHtml(order.merchant.username || '')}</a>` : '未知'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="order-summary">
+                            <div class="summary-row">
+                                <span class="summary-label">商品金额</span>
+                                <span>¥${(order.price * order.quantity).toFixed(2)}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label">运费</span>
+                                <span>免运费</span>
+                            </div>
+                            <div class="summary-row total-row">
+                                <span class="summary-label">实付金额</span>
+                                <span class="total-price">¥${order.total_price.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div class="order-actions">
+                            ${order.status === 'pending' ? `
+                                <button class="btn btn-primary" onclick="payOrder(${order.id})">立即付款</button>
+                                <button class="btn btn-danger" onclick="cancelOrder(${order.id})">取消订单</button>
+                            ` : ''}
+                            ${order.status === 'paid' ? `
+                                <button class="btn btn-outline" onclick="remindSeller(${order.id})">提醒发货</button>
+                            ` : ''}
+                            ${order.status === 'shipped' ? `
+                                <button class="btn btn-success" onclick="confirmReceipt(${order.id})">确认收货</button>
+                            ` : ''}
+                            ${order.status === 'completed' ? `
+                                <button class="btn btn-outline" onclick="buyAgain(${order.product_id})">再次购买</button>
+                            ` : ''}
+                            ${order.status === 'cancelled' ? `
+                                <button class="btn btn-outline" onclick="buyAgain(${order.product_id})">重新购买</button>
+                            ` : ''}
+                            <button class="btn btn-outline" onclick="viewOrder(${order.id})">查看详情</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStatusText(status) {
+            const map = {
+                'pending': '待付款',
+                'paid': '待发货',
+                'shipped': '待收货',
+                'completed': '已完成',
+                'cancelled': '已取消'
+            };
+            return map[status] || status;
+        }
+
+        function getPaymentMethodText(method) {
+            const map = {
+                'alipay': '支付宝',
+                'wechat': '微信支付',
+                'bank': '银行卡'
+            };
+            return map[method] || (method || '未填写');
+        }
+
+        async function viewOrder(orderId) {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            const result = await apiGet(`/order/${orderId}`);
+            if (result.code === 200) {
+                const order = result.data;
+                document.getElementById('orderDetailBody').innerHTML = `
+                    <div class="order-detail">
+                        <div class="detail-row">
+                            <span class="detail-label">订单号</span>
+                            <span class="detail-value">${order.order_no}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商品名称</span>
+                            <span class="detail-value">${escapeHtml(order.product_title)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商家</span>
+                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.username ? order.merchant.username : '未知')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商家实名</span>
+                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.real_name ? order.merchant.real_name : '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商家手机</span>
+                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.phone ? order.merchant.phone : '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商家邮箱</span>
+                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.email ? order.merchant.email : '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商家地址</span>
+                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.address ? order.merchant.address : '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商家店铺</span>
+                            <span class="detail-value">${order.merchant && order.merchant.id ? `<a class="btn btn-outline btn-sm" href="/page/merchant/${order.merchant.id}">进入店铺</a>` : '未知'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">商品单价</span>
+                            <span class="detail-value">¥${order.price}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">购买数量</span>
+                            <span class="detail-value">${order.quantity}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">订单总价</span>
+                            <span class="detail-value">¥${order.total_price}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">订单状态</span>
+                            <span class="detail-value order-status status-${order.status}">${getStatusText(order.status)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">下单时间</span>
+                            <span class="detail-value">${order.created_at || ''}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">收货人</span>
+                            <span class="detail-value">${escapeHtml(order.receiver_name || '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">联系电话</span>
+                            <span class="detail-value">${escapeHtml(order.receiver_phone || '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">收货地址</span>
+                            <span class="detail-value">${escapeHtml(order.receiver_address || '未填写')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">支付方式</span>
+                            <span class="detail-value">${escapeHtml(getPaymentMethodText(order.payment_method))}</span>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('orderDetailModal').style.display = 'flex';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('orderDetailModal').style.display = 'none';
+        }
+
+        async function payOrder(orderId) {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            document.getElementById('payBody').innerHTML = '<div class="loading">加载中...</div>';
+            document.getElementById('payModal').style.display = 'flex';
+
+            const [orderResult, profileResult] = await Promise.all([
+                apiGet(`/order/${orderId}`),
+                apiGet(`/user/${user.id}`)
+            ]);
+
+            if (orderResult.code !== 200) {
+                showMessage(orderResult.message || '获取订单信息失败', 'error');
+                closePayModal();
+                return;
+            }
+
+            const order = orderResult.data;
+            const profile = profileResult.code === 200 ? (profileResult.data || {}) : {};
+
+            const defaultName = order.receiver_name || profile.real_name || user.real_name || '';
+            const defaultPhone = order.receiver_phone || profile.phone || user.phone || '';
+            const defaultAddress = order.receiver_address || profile.address || '';
+            const defaultMethod = order.payment_method || 'alipay';
+
+            document.getElementById('payBody').innerHTML = `
+                <div class="order-detail-content">
+                    <div class="form-group">
+                        <label>订单信息</label>
+                        <div class="order-summary">
+                            <div class="summary-row"><span class="summary-label">订单号</span><span>${order.order_no}</span></div>
+                            <div class="summary-row"><span class="summary-label">商品</span><span>${escapeHtml(order.product_title || '')}</span></div>
+                            <div class="summary-row"><span class="summary-label">数量</span><span>${order.quantity}</span></div>
+                            <div class="summary-row total-row"><span class="summary-label">应付金额</span><span class="total-price">¥${order.total_price}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payName">收货人姓名</label>
+                        <input type="text" id="payName" class="form-control" placeholder="请输入收货人姓名" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payPhone">联系电话</label>
+                        <input type="tel" id="payPhone" class="form-control" placeholder="请输入联系电话" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payAddress">收货地址</label>
+                        <textarea id="payAddress" class="form-control" placeholder="请输入详细收货地址" rows="3" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="payMethod">支付方式</label>
+                        <select id="payMethod" class="form-control" required>
+                            <option value="">请选择支付方式</option>
+                            <option value="alipay">支付宝</option>
+                            <option value="wechat">微信支付</option>
+                            <option value="bank">银行卡</option>
+                        </select>
+                    </div>
+
+                    <div class="order-actions">
+                        <button class="btn btn-outline" onclick="closePayModal()">取消</button>
+                        <button class="btn btn-primary" onclick="confirmPay(${orderId})">确认支付 ¥${order.total_price}</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('payName').value = defaultName;
+            document.getElementById('payPhone').value = defaultPhone;
+            document.getElementById('payAddress').value = defaultAddress;
+            document.getElementById('payMethod').value = defaultMethod;
+            document.getElementById('payModal').style.display = 'flex';
+        }
+
+        function closePayModal() {
+            document.getElementById('payModal').style.display = 'none';
+        }
+
+        async function confirmPay(orderId) {
+            const name = String(document.getElementById('payName').value || '').trim();
+            const phone = String(document.getElementById('payPhone').value || '').trim();
+            const address = String(document.getElementById('payAddress').value || '').trim();
+            const method = String(document.getElementById('payMethod').value || '').trim();
+
+            if (!name || !phone || !address || !method) {
+                showMessage('请填写完整的收货信息与支付方式', 'error');
+                return;
+            }
+
+            if (!/^1[3-9]\d{9}$/.test(phone)) {
+                showMessage('请输入有效的手机号码', 'error');
+                return;
+            }
+
+            if (!['alipay', 'wechat', 'bank'].includes(method)) {
+                showMessage('请选择有效的支付方式', 'error');
+                return;
+            }
+
+            const methodText = getPaymentMethodText(method);
+            if (!confirm(`确认支付订单吗?\n\n收货人: ${name}\n电话: ${phone}\n地址: ${address}\n支付方式: ${methodText}`)) {
+                return;
+            }
+
+            const result = await apiPut(`/order/${orderId}/pay`, {
+                receiver_name: name,
+                receiver_phone: phone,
+                receiver_address: address,
+                payment_method: method
+            });
+
+            if (result.code === 200) {
+                showMessage('付款成功，等待卖家发货');
+                closePayModal();
+                loadOrders(currentStatus);
+            } else {
+                showMessage(result.message || '付款失败', 'error');
+            }
+        }
+
+        async function cancelOrder(orderId) {
+            if (!confirm('确定要取消此订单吗？')) return;
+
+            const result = await apiPut(`/order/${orderId}/status`, { status: 'cancelled' });
+            if (result.code === 200) {
+                showMessage('订单已取消');
+                loadOrders(currentStatus);
+            } else {
+                showMessage(result.message || '取消失败', 'error');
+            }
+        }
+
+        async function remindSeller(orderId) {
+            showMessage('已提醒卖家发货');
+        }
+
+        async function confirmReceipt(orderId) {
+            if (!confirm('确定已收到商品吗？\n\n温馨提示：请在确认收到商品后再点击确认，以免造成不必要的纠纷。')) return;
+
+            const result = await apiPut(`/order/${orderId}/confirm`);
+            if (result.code === 200) {
+                showMessage('确认收货成功，感谢您的购买！');
+                loadOrders(currentStatus);
+            } else {
+                showMessage(result.message || '操作失败', 'error');
+            }
+        }
+
+        function buyAgain(productId) {
+            window.location.href = `/page/product/${productId}`;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('click', function (event) {
+            const detailModal = document.getElementById('orderDetailModal');
+            const payModal = document.getElementById('payModal');
+            if (event.target === detailModal) {
+                closeModal();
+            }
+            if (event.target === payModal) {
+                closePayModal();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadOrders();
+        });
+    </script>
+</body>
+
+</html>

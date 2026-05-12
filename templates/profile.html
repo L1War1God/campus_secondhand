@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 校园二手交易平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container mt-40">
+        <!-- 返回购物界面按钮 -->
+        <div class="back-to-shop">
+            <a href="/page/index" class="btn btn-outline btn-lg">
+                <span>←</span>
+                <span>回到购物界面</span>
+            </a>
+        </div>
+
+        <div class="profile-container">
+            <!-- 左侧导航 -->
+            <div class="profile-sidebar">
+                <!-- 用户信息卡片 -->
+                <div class="user-card">
+                    <div class="avatar-wrapper">
+                        <div class="avatar">
+                            <span class="avatar-icon">👤</span>
+                        </div>
+                        <button class="avatar-edit-btn" onclick="changeAvatar()">📷</button>
+                    </div>
+                    <h3 class="user-name" id="userName">加载中...</h3>
+                    <p class="user-role" id="userRole">普通用户</p>
+                </div>
+
+                <!-- 统计数据 -->
+                <div class="stats-mini">
+                    <div class="stat-item">
+                        <span class="stat-num" id="productCount">0</span>
+                        <span class="stat-text">发布商品</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-num" id="orderCount">0</span>
+                        <span class="stat-text">我的订单</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-num" id="favoriteCount">0</span>
+                        <span class="stat-text">收藏</span>
+                    </div>
+                </div>
+
+                <!-- 导航菜单 -->
+                <nav class="profile-nav">
+                    <a href="#basic" class="nav-item active" onclick="showSection('basic')">
+                        <span class="nav-icon">👤</span>
+                        <span>基本信息</span>
+                    </a>
+                    <a href="#orders" class="nav-item" onclick="showSection('orders')">
+                        <span class="nav-icon">📋</span>
+                        <span>我的订单</span>
+                    </a>
+                    <a href="#products" class="nav-item" onclick="showSection('products')">
+                        <span class="nav-icon">📦</span>
+                        <span>我发布的商品</span>
+                    </a>
+                    <a href="#favorites" class="nav-item" onclick="showSection('favorites')">
+                        <span class="nav-icon">❤️</span>
+                        <span>我的收藏</span>
+                    </a>
+                    <a href="#settings" class="nav-item" onclick="showSection('settings')">
+                        <span class="nav-icon">⚙️</span>
+                        <span>账户设置</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- 右侧内容区 -->
+            <div class="profile-content">
+                <!-- 基本信息 -->
+                <div id="basic" class="content-section active">
+                    <div class="section-header">
+                        <h2 class="section-title">基本信息</h2>
+                    </div>
+                    <form id="profileForm" class="profile-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>用户名</label>
+                                <input type="text" class="form-control" id="username" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>角色</label>
+                                <input type="text" class="form-control" id="role" disabled>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>真实姓名</label>
+                                <input type="text" id="realName" class="form-control">
+                                <span id="realNameHint" class="form-hint"></span>
+                            </div>
+                            <div class="form-group">
+                                <label>地址</label>
+                                <input type="text" id="address" class="form-control" placeholder="请输入地址">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>手机号</label>
+                                <input type="tel" id="phone" class="form-control">
+                                <span id="phoneHint" class="form-hint"></span>
+                            </div>
+                            <div class="form-group">
+                                <label>邮箱</label>
+                                <input type="email" id="email" class="form-control">
+                                <span id="emailHint" class="form-hint"></span>
+                            </div>
+                        </div>
+                        <div id="errorMsg" class="error-msg" style="display: none;"></div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-lg">💾 保存修改</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 我的订单 -->
+                <div id="orders" class="content-section">
+                    <div class="section-header">
+                        <h2 class="section-title">我的订单</h2>
+                        <div class="filter-tabs">
+                            <button class="filter-tab active" data-status="">全部</button>
+                            <button class="filter-tab" data-status="pending">待付款</button>
+                            <button class="filter-tab" data-status="paid">待发货</button>
+                            <button class="filter-tab" data-status="shipped">待收货</button>
+                            <button class="filter-tab" data-status="completed">已完成</button>
+                        </div>
+                    </div>
+                    <div id="orderList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 我发布的商品 -->
+                <div id="products" class="content-section">
+                    <div class="section-header">
+                        <h2 class="section-title">我发布的商品</h2>
+                        <a href="/page/publish" class="btn btn-outline">📝 发布新商品</a>
+                    </div>
+                    <div id="myProductList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 我的收藏 -->
+                <div id="favorites" class="content-section">
+                    <div class="section-header">
+                        <h2 class="section-title">我的收藏</h2>
+                    </div>
+                    <div id="favoriteList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 账户设置 -->
+                <div id="settings" class="content-section">
+                    <div class="section-header">
+                        <h2 class="section-title">账户设置</h2>
+                    </div>
+                    <div class="settings-list" id="settingsList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'footer.html' %}
+
+    <!-- 修改密码弹窗 -->
+    <div id="passwordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>修改密码</h3>
+                <button class="modal-close" onclick="closePasswordModal()">✕</button>
+            </div>
+            <form id="passwordForm">
+                <div class="form-group">
+                    <label>原密码</label>
+                    <input type="password" id="oldPassword" class="form-control" required>
+                    <span id="oldPasswordHint" class="form-hint"></span>
+                </div>
+                <div class="form-group">
+                    <label>新密码</label>
+                    <input type="password" id="newPassword" class="form-control" required>
+                    <span id="newPasswordHint" class="form-hint"></span>
+                </div>
+                <div class="form-group">
+                    <label>确认新密码</label>
+                    <input type="password" id="confirmPassword" class="form-control" required>
+                    <span id="confirmPasswordHint" class="form-hint"></span>
+                </div>
+                <div id="passwordError" class="error-msg" style="display: none;"></div>
+                <button type="submit" class="btn btn-lg">确认修改</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 绑定邮箱弹窗 -->
+    <div id="emailModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>绑定邮箱</h3>
+                <button class="modal-close" onclick="closeEmailModal()">✕</button>
+            </div>
+            <form id="emailForm">
+                <div class="form-group">
+                    <label>邮箱地址</label>
+                    <input type="email" id="bindEmail" class="form-control" required>
+                    <span id="bindEmailHint" class="form-hint"></span>
+                </div>
+                <div class="form-group">
+                    <label>验证码</label>
+                    <div class="captcha-row">
+                        <input type="text" id="emailCaptcha" class="form-control" required>
+                        <button type="button" class="btn btn-outline" onclick="sendEmailCaptcha()">发送验证码</button>
+                    </div>
+                </div>
+                <div id="emailError" class="error-msg" style="display: none;"></div>
+                <button type="submit" class="btn btn-lg">确认绑定</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 绑定手机弹窗 -->
+    <div id="phoneModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>绑定手机</h3>
+                <button class="modal-close" onclick="closePhoneModal()">✕</button>
+            </div>
+            <form id="phoneForm">
+                <div class="form-group">
+                    <label>手机号码</label>
+                    <input type="tel" id="bindPhone" class="form-control" required>
+                    <span id="bindPhoneHint" class="form-hint"></span>
+                </div>
+                <div class="form-group">
+                    <label>验证码</label>
+                    <div class="captcha-row">
+                        <input type="text" id="phoneCaptcha" class="form-control" required>
+                        <button type="button" class="btn btn-outline" onclick="sendPhoneCaptcha()">发送验证码</button>
+                    </div>
+                </div>
+                <div id="phoneError" class="error-msg" style="display: none;"></div>
+                <button type="submit" class="btn btn-lg">确认绑定</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 订单详情弹窗 -->
+    <div id="orderDetailModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>订单详情</h3>
+                <button class="modal-close" onclick="closeOrderDetailModal()">✕</button>
+            </div>
+            <div id="orderDetailContent">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 支付确认弹窗 -->
+    <div id="payModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>确认支付</h3>
+                <button class="modal-close" onclick="closePayModal()">✕</button>
+            </div>
+            <div id="payContent">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const user = getCurrentUser();
+            if (!user) {
+                window.location.href = '/page/login';
+                return;
+            }
+
+            // 显示指定区域
+            window.showSection = function (sectionId) {
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.getElementById(sectionId).classList.add('active');
+                document.querySelector(`[href="#${sectionId}"]`).classList.add('active');
+
+                // 按需加载数据
+                if (sectionId === 'orders') loadOrders();
+                if (sectionId === 'products') loadMyProducts();
+                if (sectionId === 'favorites') loadFavorites();
+                if (sectionId === 'settings') loadProfile(); // 重新加载用户信息来更新设置界面
+            }
+
+            // 加载用户基本信息
+            async function loadProfile() {
+                console.log('Loading profile for user:', user.id);
+                const result = await apiGet(`/user/${user.id}`);
+                console.log('API Result:', result);
+                if (result.code === 200) {
+                    renderProfile(result.data);
+                    // 更新用户本地存储
+                    saveUser(result.data);
+                } else {
+                    console.error('Failed to load profile:', result.message);
+                }
+            }
+
+            // 加载统计数据
+            window.loadStats = async function () {
+                const [products, orders, favorites] = await Promise.all([
+                    apiGet(`/products/search?user_id=${user.id}`),
+                    apiGet(`/orders?user_id=${user.id}`),
+                    apiGet(`/favorites?user_id=${user.id}`)
+                ]);
+
+                document.getElementById('productCount').textContent = products.data?.length || 0;
+                document.getElementById('orderCount').textContent = orders.data?.length || 0;
+                document.getElementById('favoriteCount').textContent = favorites.data?.length || 0;
+            };
+
+            // 渲染用户信息
+            function renderProfile(userData) {
+                document.getElementById('userName').textContent = userData.username;
+                document.getElementById('userRole').textContent = userData.role === 'admin' ? '管理员' : (userData.role === 'merchant' ? '商家' : '普通用户');
+                document.getElementById('username').value = userData.username;
+                document.getElementById('role').value = userData.role === 'admin' ? '管理员' : (userData.role === 'merchant' ? '商家' : '普通用户');
+                document.getElementById('realName').value = userData.real_name || '';
+                document.getElementById('address').value = userData.address || '';
+                document.getElementById('phone').value = userData.phone || '';
+                document.getElementById('email').value = userData.email || '';
+                // 同时更新设置界面
+                renderSettings(userData);
+            }
+
+            // 渲染账户设置
+            function renderSettings(userData) {
+                const container = document.getElementById('settingsList');
+
+                // 格式化手机号显示(中间四位隐藏)
+                const formatPhone = (phone) => {
+                    if (!phone) return '';
+                    return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+                };
+
+                // 格式化邮箱显示(中间部分隐藏)
+                const formatEmail = (email) => {
+                    if (!email) return '';
+                    const [name, domain] = email.split('@');
+                    if (name.length <= 2) return email;
+                    return name.slice(0, 2) + '***@' + domain;
+                };
+
+                const isPhoneBound = userData.phone && userData.phone.length >= 11;
+                const isEmailBound = userData.email && userData.email.includes('@');
+
+                container.innerHTML = `
+                    <div class="settings-item">
+                        <span class="settings-icon">🔒</span>
+                        <div class="settings-info">
+                            <h4>修改密码</h4>
+                            <p>定期更改密码保障账户安全</p>
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="changePassword()">修改</button>
+                    </div>
+                    <div class="settings-item">
+                        <span class="settings-icon">📧</span>
+                        <div class="settings-info">
+                            <h4>${isEmailBound ? '邮箱' : '绑定邮箱'}</h4>
+                            <p>${isEmailBound ? '已绑定: ' + formatEmail(userData.email) : '绑定邮箱可用于找回密码'}</p>
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="bindEmail()">${isEmailBound ? '修改' : '绑定'}</button>
+                    </div>
+                    <div class="settings-item">
+                        <span class="settings-icon">📱</span>
+                        <div class="settings-info">
+                            <h4>${isPhoneBound ? '手机' : '绑定手机'}</h4>
+                            <p>${isPhoneBound ? '已绑定: ' + formatPhone(userData.phone) : '绑定手机可接收订单通知'}</p>
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="bindPhone()">${isPhoneBound ? '修改' : '绑定'}</button>
+                    </div>
+                    <div class="settings-item danger">
+                        <span class="settings-icon">🗑️</span>
+                        <div class="settings-info">
+                            <h4>注销账户</h4>
+                            <p>此操作不可撤销,请谨慎操作</p>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="deleteAccount()">注销</button>
+                    </div>
+                `;
+            }
+
+            // 加载订单
+            async function loadOrders(status = '') {
+                let url = `/orders?user_id=${user.id}`;
+                if (status) url += `&status=${status}`;
+
+                const result = await apiGet(url);
+                const container = document.getElementById('orderList');
+
+                if (result.code === 200) {
+                    if (!result.data || result.data.length === 0) {
+                        container.innerHTML = '<div class="empty-state"><div class="icon">📦</div><h3>暂无订单</h3></div>';
+                        return;
+                    }
+
+                    container.innerHTML = result.data.map(order => `
+                        <div class="order-card">
+                            <div class="order-header">
+                                <span>订单号: ${order.order_no}</span>
+                                <span class="order-status status-${order.status}">${getStatusText(order.status)}</span>
+                            </div>
+                            <div class="order-body">
+                                <div class="order-info">
+                                    <h4>${escapeHtml(order.product_title)}</h4>
+                                    <p>数量: ${order.quantity} | 总价: ¥${order.total_price}</p>
+                                    <p>商家: ${order.merchant && order.merchant.id ? `<a class="merchant-link" href="/page/merchant/${order.merchant.id}">${escapeHtml(order.merchant.username || '')}</a>` : escapeHtml(order.merchant && order.merchant.username ? order.merchant.username : '未知')}</p>
+                                    <p>下单时间: ${order.created_at}</p>
+                                </div>
+                                <div class="order-actions">
+                                    <button class="btn btn-sm" onclick="viewOrder(${order.id})">查看详情</button>
+                                    ${order.status === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="payOrder(${order.id})">立即付款</button>` : ''}
+                                    ${order.status === 'pending' ? `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${order.id})">取消订单</button>` : ''}
+                                    ${order.status === 'shipped' ? `<button class="btn btn-sm btn-success" onclick="confirmReceipt(${order.id})">确认收货</button>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><h3>加载失败</h3></div>';
+                }
+            }
+
+            // 获取状态文字
+            function getStatusText(status) {
+                const statusMap = {
+                    pending: '待付款',
+                    paid: '待发货',
+                    shipped: '待收货',
+                    completed: '已完成',
+                    cancelled: '已取消'
+                };
+                return statusMap[status] || status;
+            }
+
+            function getPaymentMethodText(method) {
+                const map = {
+                    alipay: '支付宝',
+                    wechat: '微信支付',
+                    bank: '银行卡'
+                };
+                return map[method] || (method || '未填写');
+            }
+
+            // 查看订单详情
+            window.viewOrder = async function (orderId) {
+                const result = await apiGet(`/order/${orderId}`);
+                const container = document.getElementById('orderDetailContent');
+
+                if (result.code === 200) {
+                    const order = result.data;
+                    container.innerHTML = `
+                        <div class="order-detail">
+                            <div class="detail-row">
+                                <span class="detail-label">订单号</span>
+                                <span class="detail-value">${order.order_no}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商品名称</span>
+                                <span class="detail-value">${escapeHtml(order.product_title)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.username ? order.merchant.username : '未知')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家实名</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.real_name ? order.merchant.real_name : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家手机</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.phone ? order.merchant.phone : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家邮箱</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.email ? order.merchant.email : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家地址</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.address ? order.merchant.address : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家店铺</span>
+                                <span class="detail-value">${order.merchant && order.merchant.id ? `<a class="btn btn-outline btn-sm" href="/page/merchant/${order.merchant.id}">进入店铺</a>` : '未知'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商品单价</span>
+                                <span class="detail-value">¥${order.price}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">购买数量</span>
+                                <span class="detail-value">${order.quantity}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">订单总价</span>
+                                <span class="detail-value">¥${order.total_price}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">订单状态</span>
+                                <span class="detail-value order-status status-${order.status}">${getStatusText(order.status)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">下单时间</span>
+                                <span class="detail-value">${order.created_at}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">收货人</span>
+                                <span class="detail-value">${escapeHtml(order.receiver_name || '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">联系电话</span>
+                                <span class="detail-value">${escapeHtml(order.receiver_phone || '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">收货地址</span>
+                                <span class="detail-value">${escapeHtml(order.receiver_address || '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">支付方式</span>
+                                <span class="detail-value">${escapeHtml(getPaymentMethodText(order.payment_method))}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><h3>加载失败</h3></div>';
+                }
+                document.getElementById('orderDetailModal').style.display = 'flex';
+            }
+
+            // 支付订单 - 显示支付确认页面
+            window.payOrder = async function (orderId) {
+                // 先获取订单详情
+                const result = await apiGet(`/order/${orderId}`);
+                if (result.code === 200) {
+                    const order = result.data;
+                    const payContent = document.getElementById('payContent');
+                    payContent.innerHTML = `
+                        <div class="order-detail-content">
+                            <div class="form-group">
+                                <label>订单信息</label>
+                                <div class="order-summary">
+                                    <div class="summary-row"><span class="summary-label">订单号</span><span>${order.order_no}</span></div>
+                                    <div class="summary-row"><span class="summary-label">商品</span><span>${escapeHtml(order.product_title || '')}</span></div>
+                                    <div class="summary-row"><span class="summary-label">数量</span><span>${order.quantity}</span></div>
+                                    <div class="summary-row total-row"><span class="summary-label">应付金额</span><span class="total-price">¥${order.total_price}</span></div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payName">收货人姓名</label>
+                                <input type="text" id="payName" class="form-control" placeholder="请输入收货人姓名" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payPhone">联系电话</label>
+                                <input type="tel" id="payPhone" class="form-control" placeholder="请输入联系电话" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payAddress">收货地址</label>
+                                <textarea id="payAddress" class="form-control" placeholder="请输入详细收货地址" rows="3" required></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payMethod">支付方式</label>
+                                <select id="payMethod" class="form-control" required>
+                                    <option value="">请选择支付方式</option>
+                                    <option value="alipay">支付宝</option>
+                                    <option value="wechat">微信支付</option>
+                                    <option value="bank">银行卡</option>
+                                </select>
+                            </div>
+                            
+                            <div class="order-actions">
+                                <button class="btn btn-outline" onclick="closePayModal()">取消</button>
+                                <button class="btn btn-primary" onclick="confirmPay(${orderId})">确认支付 ¥${order.total_price}</button>
+                            </div>
+                        </div>
+                    `;
+
+                    const currentUser = getCurrentUser() || {};
+                    document.getElementById('payName').value = order.receiver_name || currentUser.real_name || '';
+                    document.getElementById('payPhone').value = order.receiver_phone || currentUser.phone || '';
+                    document.getElementById('payAddress').value = order.receiver_address || currentUser.address || '';
+                    document.getElementById('payMethod').value = order.payment_method || 'alipay';
+
+                    document.getElementById('payModal').style.display = 'flex';
+                } else {
+                    showMessage('获取订单信息失败: ' + result.message, 'error');
+                }
+            }
+
+            // 确认支付
+            window.confirmPay = async function (orderId) {
+                const name = String(document.getElementById('payName').value || '').trim();
+                const phone = String(document.getElementById('payPhone').value || '').trim();
+                const address = String(document.getElementById('payAddress').value || '').trim();
+                const method = String(document.getElementById('payMethod').value || '').trim();
+
+                if (!name || !phone || !address || !method) {
+                    showMessage('请填写完整的收货信息与支付方式', 'error');
+                    return;
+                }
+
+                if (!/^1[3-9]\d{9}$/.test(phone)) {
+                    showMessage('请输入有效的手机号码', 'error');
+                    return;
+                }
+
+                if (confirm(`确认支付订单吗?\n\n收货人: ${name}\n电话: ${phone}\n地址: ${address}\n支付方式: ${method === 'alipay' ? '支付宝' : method === 'wechat' ? '微信支付' : '银行卡'}`)) {
+                    const result = await apiPut(`/order/${orderId}/pay`, {
+                        receiver_name: name,
+                        receiver_phone: phone,
+                        receiver_address: address,
+                        payment_method: method
+                    });
+                    if (result.code === 200) {
+                        showMessage('支付成功');
+                        closePayModal();
+                        loadOrders();
+                        loadStats();
+                    } else {
+                        showMessage('支付失败: ' + result.message, 'error');
+                    }
+                }
+            }
+
+            // 关闭支付弹窗
+            window.closePayModal = function () {
+                document.getElementById('payModal').style.display = 'none';
+            }
+
+            // 取消订单
+            window.cancelOrder = async function (orderId) {
+                const confirmed = confirm('确认取消此订单吗?\n\n取消后订单状态将变为"已取消",且无法恢复。\n如果已支付,请联系卖家协商退款。');
+                if (confirmed) {
+                    const result = await apiPut(`/order/${orderId}/status`, { status: 'cancelled' });
+                    if (result.code === 200) {
+                        showMessage('订单已取消');
+                        loadOrders();
+                        loadStats();
+                    } else if (result.code === 400) {
+                        showMessage('无法取消: ' + result.message);
+                    } else if (result.code === 404) {
+                        showMessage('订单不存在');
+                    } else {
+                        showMessage('取消失败: ' + result.message);
+                    }
+                }
+            }
+
+            // 确认收货
+            async function confirmReceipt(orderId) {
+                if (confirm('确认已收到商品吗?')) {
+                    const result = await apiPut(`/order/${orderId}/confirm`);
+                    if (result.code === 200) {
+                        showMessage('确认收货成功');
+                        loadOrders();
+                        loadStats();
+                    } else {
+                        showMessage('操作失败: ' + result.message);
+                    }
+                }
+            }
+
+            // 加载我发布的商品
+            async function loadMyProducts() {
+                const result = await apiGet(`/products/search?user_id=${user.id}`);
+                const container = document.getElementById('myProductList');
+
+                if (result.code === 200) {
+                    if (!result.data || result.data.length === 0) {
+                        container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>暂无发布商品</h3><p><a href="/page/publish" class="btn">去发布</a></p></div>';
+                        return;
+                    }
+
+                    container.innerHTML = `<div class="product-grid">${result.data.map(product => {
+                        const image = product.images && product.images.length > 0
+                            ? `<img src="${encodeURI(product.images[0])}" alt="${escapeHtml(product.title)}" class="product-img">`
+                            : `<div class="product-no-image">📷</div>`;
+                        return `
+                        <div class="product-card">
+                            <a href="/page/product/${product.id}" class="product-image-link">
+                                <div class="product-image">${image}</div>
+                            </a>
+                            <div class="product-info">
+                                <a href="/page/product/${product.id}" class="product-title">${escapeHtml(product.title)}</a>
+                                <div class="product-price-row">
+                                    <span class="product-price">¥${product.price}</span>
+                                    ${product.original_price ? `<span class="product-original-price">¥${product.original_price}</span>` : ''}
+                                </div>
+                                <div class="product-meta">
+                                    <span>👁️ ${product.views}</span>
+                                    <span>💬 ${product.comments || 0}</span>
+                                </div>
+                                <div class="product-actions">
+                                    <button class="btn btn-sm btn-outline" onclick="editProduct(${product.id})">编辑</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteProduct(${product.id})">删除</button>
+                                </div>
+                            </div>
+                        </div>
+                    `}).join('')}</div>`;
+                }
+            }
+
+            // 编辑商品
+            window.editProduct = function (productId) {
+                window.location.href = `/page/publish?edit=${productId}`;
+            }
+
+            // 删除商品
+            window.deleteProduct = async function (productId) {
+                if (confirm('确认删除此商品吗?此操作不可撤销.')) {
+                    const result = await apiDelete(`/product/${productId}`);
+                    if (result.code === 200) {
+                        showMessage('删除成功');
+                        loadMyProducts();
+                        loadStats();
+                    } else {
+                        showMessage('删除失败: ' + result.message);
+                    }
+                }
+            }
+
+            // 加载收藏
+            window.loadFavorites = async function () {
+                const result = await apiGet(`/favorites?user_id=${user.id}`);
+                const container = document.getElementById('favoriteList');
+
+                const normalizeImageSrc = (image) => {
+                    if (!image) return '';
+                    const trimmed = String(image).trim();
+                    if (!trimmed) return '';
+                    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('/')) {
+                        return trimmed;
+                    }
+                    return '/' + trimmed;
+                };
+
+                if (result.code === 200) {
+                    if (!result.data || result.data.length === 0) {
+                        container.innerHTML = '<div class="empty-state"><div class="icon">❤️</div><h3>暂无收藏</h3><p>去发现心仪的商品吧~</p><a href="/page/index" class="btn btn-primary">去逛逛</a></div>';
+                        return;
+                    }
+
+                    container.innerHTML = `<div class="product-grid">${result.data.map(item => {
+                        const imageSrc = normalizeImageSrc(item.image);
+                        const image = imageSrc ? `<img src="${encodeURI(imageSrc)}" alt="${escapeHtml(item.title)}" class="product-img">` : '<div class="product-no-image">📷</div>';
+                        return `
+                        <div class="product-card">
+                            <a href="/page/product/${item.product_id}" class="product-image-link">
+                                <div class="product-image">${image}</div>
+                            </a>
+                            <div class="product-info">
+                                <a href="/page/product/${item.product_id}" class="product-title">${escapeHtml(item.title)}</a>
+                                <div class="product-price-row">
+                                    <span class="product-price">¥${item.price}</span>
+                                    ${item.original_price ? `<span class="product-original-price">¥${item.original_price}</span>` : ''}
+                                </div>
+                                <div class="product-meta">
+                                    <span>👁️ ${item.views || 0}</span>
+                                </div>
+                                <div class="product-actions">
+                                    <button class="btn btn-sm btn-outline" onclick="viewProduct(${item.product_id})">查看详情</button>
+                                    <button class="btn btn-sm btn-danger" onclick="removeFavorite(${item.id})">取消收藏</button>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}</div>`;
+                }
+            };
+
+            // 查看详情
+            window.viewProduct = function (productId) {
+                window.location.href = '/page/product/' + productId;
+            };
+
+            // 取消收藏
+            window.removeFavorite = async function (favoriteId) {
+                const result = await apiDelete('/favorites/' + favoriteId);
+                if (result.code === 200) {
+                    showMessage('已取消收藏');
+                    loadFavorites();
+                    loadStats();
+                } else {
+                    showMessage('操作失败: ' + result.message);
+                }
+            };
+
+            // 修改密码弹窗
+            window.changePassword = function () {
+                document.getElementById('passwordModal').style.display = 'block';
+            }
+
+            // 关闭密码弹窗
+            window.closePasswordModal = function () {
+                document.getElementById('passwordModal').style.display = 'none';
+                document.getElementById('passwordForm').reset();
+                document.getElementById('passwordError').style.display = 'none';
+            }
+
+            // 绑定邮箱弹窗
+            window.bindEmail = function () {
+                document.getElementById('emailModal').style.display = 'block';
+            }
+
+            // 关闭邮箱弹窗
+            window.closeEmailModal = function () {
+                document.getElementById('emailModal').style.display = 'none';
+                document.getElementById('emailForm').reset();
+                document.getElementById('emailError').style.display = 'none';
+            }
+
+            // 绑定手机弹窗
+            window.bindPhone = function () {
+                document.getElementById('phoneModal').style.display = 'block';
+            }
+
+            // 关闭手机弹窗
+            window.closePhoneModal = function () {
+                document.getElementById('phoneModal').style.display = 'none';
+                document.getElementById('phoneForm').reset();
+                document.getElementById('phoneError').style.display = 'none';
+            }
+
+            // 关闭订单详情弹窗
+            window.closeOrderDetailModal = function () {
+                document.getElementById('orderDetailModal').style.display = 'none';
+            }
+
+            // 发送邮箱验证码
+            window.sendEmailCaptcha = function () {
+                const email = document.getElementById('bindEmail').value;
+                if (!validateEmailFormat(email)) {
+                    document.getElementById('bindEmailHint').textContent = '请输入有效的邮箱地址';
+                    document.getElementById('bindEmailHint').className = 'form-hint error';
+                    return;
+                }
+                apiPost('/user/send-email-captcha', { email }).then(result => {
+                    if (result.code === 200) {
+                        showMessage('验证码已发送');
+                    } else {
+                        showMessage('发送失败: ' + result.message);
+                    }
+                });
+            }
+
+            // 发送手机验证码
+            window.sendPhoneCaptcha = function () {
+                const phone = document.getElementById('bindPhone').value;
+                if (!validatePhoneFormat(phone)) {
+                    document.getElementById('bindPhoneHint').textContent = '请输入有效的手机号';
+                    document.getElementById('bindPhoneHint').className = 'form-hint error';
+                    return;
+                }
+                apiPost('/user/send-phone-captcha', { phone }).then(result => {
+                    if (result.code === 200) {
+                        showMessage('验证码已发送');
+                    } else {
+                        showMessage('发送失败: ' + result.message);
+                    }
+                });
+            }
+
+            // 验证邮箱格式
+            function validateEmailFormat(email) {
+                const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                return regex.test(email);
+            }
+
+            // 验证手机号格式
+            function validatePhoneFormat(phone) {
+                const regex = /^1[3-9]\d{9}$/;
+                return regex.test(phone);
+            }
+
+            // 转义HTML
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // 表单验证 - 真实姓名
+            function validateRealName(name) {
+                const hint = document.getElementById('realNameHint');
+                if (!name) {
+                    hint.textContent = '';
+                    hint.className = 'form-hint';
+                    return true;
+                }
+                if (!/^[\u4e00-\u9fa5]{2,10}$/.test(name)) {
+                    hint.textContent = '请输入2-10个汉字';
+                    hint.className = 'form-hint error';
+                    return false;
+                }
+                hint.textContent = '✓ 格式正确';
+                hint.className = 'form-hint success';
+                return true;
+            }
+
+            // 表单验证 - 学号
+            function validateStudentId(id) {
+                const hint = document.getElementById('studentIdHint');
+                if (!id) {
+                    hint.textContent = '';
+                    hint.className = 'form-hint';
+                    return true;
+                }
+                if (!/^\d{8,12}$/.test(id)) {
+                    hint.textContent = '学号应为8-12位数字';
+                    hint.className = 'form-hint error';
+                    return false;
+                }
+                hint.textContent = '✓ 格式正确';
+                hint.className = 'form-hint success';
+                return true;
+            }
+
+            // 表单验证 - 手机号
+            function validatePhone(phone) {
+                const hint = document.getElementById('phoneHint');
+                if (!phone) {
+                    hint.textContent = '';
+                    hint.className = 'form-hint';
+                    return true;
+                }
+                if (!validatePhoneFormat(phone)) {
+                    hint.textContent = '请输入有效的手机号';
+                    hint.className = 'form-hint error';
+                    return false;
+                }
+                hint.textContent = '✓ 格式正确';
+                hint.className = 'form-hint success';
+                return true;
+            }
+
+            // 表单验证 - 邮箱
+            function validateEmail(email) {
+                const hint = document.getElementById('emailHint');
+                if (!email) {
+                    hint.textContent = '';
+                    hint.className = 'form-hint';
+                    return true;
+                }
+                if (!validateEmailFormat(email)) {
+                    hint.textContent = '请输入有效的邮箱地址';
+                    hint.className = 'form-hint error';
+                    return false;
+                }
+                hint.textContent = '✓ 格式正确';
+                hint.className = 'form-hint success';
+                return true;
+            }
+
+            // 修改头像
+            window.changeAvatar = function () {
+                showMessage('头像上传功能开发中');
+            }
+
+            // 注销账户
+            window.deleteAccount = function () {
+                if (confirm('⚠️ 警告:此操作将永久删除您的账户及所有相关数据,包括发布的商品、订单记录等.此操作不可撤销,确定要继续吗?')) {
+                    if (confirm('再次确认:确定要注销账户吗?')) {
+                        apiDelete(`/user/${user.id}`).then(result => {
+                            if (result.code === 200) {
+                                handleLogout();
+                                showMessage('账户已注销');
+                                setTimeout(() => {
+                                    window.location.href = '/page/index';
+                                }, 1000);
+                            } else {
+                                showMessage('注销失败: ' + result.message);
+                            }
+                        });
+                    }
+                }
+            }
+
+            // 绑定表单提交事件
+            document.getElementById('profileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const username = document.getElementById('username').value;
+                const realName = document.getElementById('realName').value;
+                const address = document.getElementById('address').value;
+                const phone = document.getElementById('phone').value;
+                const email = document.getElementById('email').value;
+
+                // 验证
+                if (!username.trim()) {
+                    showMessage('用户名不能为空');
+                    return;
+                }
+                if (!validateRealName(realName)) return;
+                if (!validatePhone(phone)) return;
+                if (!validateEmail(email)) return;
+
+                const result = await apiPut(`/user/${user.id}`, {
+                    username,
+                    real_name: realName,
+                    address,
+                    phone,
+                    email
+                });
+
+                if (result.code === 200) {
+                    showMessage('保存成功');
+                    // 更新本地存储的用户信息
+                    const currentUser = getCurrentUser();
+                    currentUser.username = username;
+                    saveUser(currentUser);
+                } else {
+                    document.getElementById('errorMsg').textContent = result.message;
+                    document.getElementById('errorMsg').style.display = 'block';
+                }
+            });
+
+            // 绑定密码表单提交
+            document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const oldPassword = document.getElementById('oldPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+
+                // 验证
+                if (!oldPassword) {
+                    document.getElementById('oldPasswordHint').textContent = '请输入原密码';
+                    document.getElementById('oldPasswordHint').className = 'form-hint error';
+                    return;
+                }
+                if (newPassword.length < 6) {
+                    document.getElementById('newPasswordHint').textContent = '新密码至少6位';
+                    document.getElementById('newPasswordHint').className = 'form-hint error';
+                    return;
+                }
+                if (newPassword !== confirmPassword) {
+                    document.getElementById('confirmPasswordHint').textContent = '两次密码不一致';
+                    document.getElementById('confirmPasswordHint').className = 'form-hint error';
+                    return;
+                }
+
+                const result = await apiPost('/user/change-password', {
+                    user_id: user.id,
+                    old_password: oldPassword,
+                    new_password: newPassword
+                });
+
+                if (result.code === 200) {
+                    showMessage('密码修改成功');
+                    closePasswordModal();
+                } else {
+                    document.getElementById('passwordError').textContent = result.message;
+                    document.getElementById('passwordError').style.display = 'block';
+                }
+            });
+
+            // 绑定邮箱表单提交
+            document.getElementById('emailForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const email = document.getElementById('bindEmail').value;
+                const captcha = document.getElementById('emailCaptcha').value;
+
+                if (!validateEmailFormat(email)) {
+                    document.getElementById('bindEmailHint').textContent = '请输入有效的邮箱地址';
+                    document.getElementById('bindEmailHint').className = 'form-hint error';
+                    return;
+                }
+                if (!captcha) {
+                    document.getElementById('emailError').textContent = '请输入验证码';
+                    document.getElementById('emailError').style.display = 'block';
+                    return;
+                }
+
+                const result = await apiPost('/user/bind-email', {
+                    user_id: user.id,
+                    email,
+                    captcha
+                });
+
+                if (result.code === 200) {
+                    showMessage('邮箱绑定成功');
+                    closeEmailModal();
+                    loadProfile();
+                } else {
+                    document.getElementById('emailError').textContent = result.message;
+                    document.getElementById('emailError').style.display = 'block';
+                }
+            });
+
+            // 绑定手机表单提交
+            document.getElementById('phoneForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const phone = document.getElementById('bindPhone').value;
+                const captcha = document.getElementById('phoneCaptcha').value;
+
+                if (!validatePhoneFormat(phone)) {
+                    document.getElementById('bindPhoneHint').textContent = '请输入有效的手机号';
+                    document.getElementById('bindPhoneHint').className = 'form-hint error';
+                    return;
+                }
+                if (!captcha) {
+                    document.getElementById('phoneError').textContent = '请输入验证码';
+                    document.getElementById('phoneError').style.display = 'block';
+                    return;
+                }
+
+                const result = await apiPost('/user/bind-phone', {
+                    user_id: user.id,
+                    phone,
+                    captcha
+                });
+
+                if (result.code === 200) {
+                    showMessage('手机绑定成功');
+                    closePhoneModal();
+                    loadProfile();
+                } else {
+                    document.getElementById('phoneError').textContent = result.message;
+                    document.getElementById('phoneError').style.display = 'block';
+                }
+            });
+
+            // 订单筛选
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    loadOrders(tab.dataset.status);
+                });
+            });
+
+            // 实时验证
+            document.getElementById('realName').addEventListener('blur', function () {
+                validateRealName(this.value);
+            });
+            document.getElementById('phone').addEventListener('blur', function () {
+                validatePhone(this.value);
+            });
+            document.getElementById('email').addEventListener('blur', function () {
+                validateEmail(this.value);
+            });
+
+            // 初始化
+            loadProfile();
+            loadOrders();
+            loadStats();
+        });
+    </script>
+</body>
+
+</html>
