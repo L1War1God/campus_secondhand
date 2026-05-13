@@ -17,6 +17,11 @@
             <p class="page-subtitle">查看和管理您的所有订单</p>
         </div>
 
+        <div class="order-type-tabs" style="margin-bottom: 20px; display: flex; gap: 20px; border-bottom: 1px solid #eee;">
+            <div class="type-tab active" data-type="buy" onclick="switchOrderType('buy')" style="padding: 10px 0; cursor: pointer; border-bottom: 2px solid #4CAF50; font-weight: bold; color: #4CAF50;">我买入的</div>
+            <div class="type-tab" data-type="sell" onclick="switchOrderType('sell')" style="padding: 10px 0; cursor: pointer; color: #666;">我卖出的</div>
+        </div>
+
         <div class="order-filter">
             <div class="filter-group">
                 <button class="filter-btn active" data-status="" onclick="loadOrders('')">
@@ -110,7 +115,26 @@
     <script src="/static/js/main.js"></script>
     <script>
         let currentStatus = '';
+        let currentType = 'buy';
         let allOrders = [];
+
+        function switchOrderType(type) {
+            currentType = type;
+            document.querySelectorAll('.type-tab').forEach(tab => {
+                const isActive = tab.dataset.type === type;
+                tab.classList.toggle('active', isActive);
+                if (isActive) {
+                    tab.style.borderBottom = '2px solid #4CAF50';
+                    tab.style.fontWeight = 'bold';
+                    tab.style.color = '#4CAF50';
+                } else {
+                    tab.style.borderBottom = 'none';
+                    tab.style.fontWeight = 'normal';
+                    tab.style.color = '#666';
+                }
+            });
+            loadOrders(currentStatus);
+        }
 
         async function loadOrders(status = '') {
             currentStatus = status;
@@ -125,7 +149,7 @@
                 return;
             }
 
-            let url = `/orders?user_id=${user.id}`;
+            let url = `/orders?user_id=${user.id}&type=${currentType}`;
             if (status) url += `&status=${status}`;
 
             const result = await apiGet(url);
@@ -192,7 +216,10 @@
                                 <div class="order-product-meta">
                                     <span>单价: ¥${order.price}</span>
                                     <span>数量: ${order.quantity}</span>
-                                    <span>商家: ${order.merchant && order.merchant.id ? `<a class="merchant-link" href="/page/merchant/${order.merchant.id}" onclick="event.stopPropagation()">${escapeHtml(order.merchant.username || '')}</a>` : '未知'}</span>
+                                    ${currentType === 'buy' ? 
+                                        `<span>商家: ${order.merchant && order.merchant.id ? `<a class="merchant-link" href="/page/merchant/${order.merchant.id}" onclick="event.stopPropagation()">${escapeHtml(order.merchant.username || '')}</a>` : '未知'}</span>` :
+                                        `<span>买家: ${order.buyer ? escapeHtml(order.buyer.username || '') : '未知'}</span>`
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -213,22 +240,28 @@
                         </div>
 
                         <div class="order-actions">
-                            ${order.status === 'pending' ? `
-                                <button class="btn btn-primary" onclick="payOrder(${order.id})">立即付款</button>
-                                <button class="btn btn-danger" onclick="cancelOrder(${order.id})">取消订单</button>
-                            ` : ''}
-                            ${order.status === 'paid' ? `
-                                <button class="btn btn-outline" onclick="remindSeller(${order.id})">提醒发货</button>
-                            ` : ''}
-                            ${order.status === 'shipped' ? `
-                                <button class="btn btn-success" onclick="confirmReceipt(${order.id})">确认收货</button>
-                            ` : ''}
-                            ${order.status === 'completed' ? `
-                                <button class="btn btn-outline" onclick="buyAgain(${order.product_id})">再次购买</button>
-                            ` : ''}
-                            ${order.status === 'cancelled' ? `
-                                <button class="btn btn-outline" onclick="buyAgain(${order.product_id})">重新购买</button>
-                            ` : ''}
+                            ${currentType === 'buy' ? `
+                                ${order.status === 'pending' ? `
+                                    <button class="btn btn-primary" onclick="payOrder(${order.id})">立即付款</button>
+                                    <button class="btn btn-danger" onclick="cancelOrder(${order.id})">取消订单</button>
+                                ` : ''}
+                                ${order.status === 'paid' ? `
+                                    <button class="btn btn-outline" onclick="remindSeller(${order.id})">提醒发货</button>
+                                ` : ''}
+                                ${order.status === 'shipped' ? `
+                                    <button class="btn btn-success" onclick="confirmReceipt(${order.id})">确认收货</button>
+                                ` : ''}
+                                ${order.status === 'completed' ? `
+                                    <button class="btn btn-outline" onclick="buyAgain(${order.product_id})">再次购买</button>
+                                ` : ''}
+                                ${order.status === 'cancelled' ? `
+                                    <button class="btn btn-outline" onclick="buyAgain(${order.product_id})">重新购买</button>
+                                ` : ''}
+                            ` : `
+                                ${order.status === 'paid' ? `
+                                    <button class="btn btn-primary" onclick="shipOrder(${order.id})">立即发货</button>
+                                ` : ''}
+                            `}
                             <button class="btn btn-outline" onclick="viewOrder(${order.id})">查看详情</button>
                         </div>
                     </div>
@@ -273,30 +306,45 @@
                             <span class="detail-label">商品名称</span>
                             <span class="detail-value">${escapeHtml(order.product_title)}</span>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">商家</span>
-                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.username ? order.merchant.username : '未知')}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">商家实名</span>
-                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.real_name ? order.merchant.real_name : '未填写')}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">商家手机</span>
-                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.phone ? order.merchant.phone : '未填写')}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">商家邮箱</span>
-                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.email ? order.merchant.email : '未填写')}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">商家地址</span>
-                            <span class="detail-value">${escapeHtml(order.merchant && order.merchant.address ? order.merchant.address : '未填写')}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">商家店铺</span>
-                            <span class="detail-value">${order.merchant && order.merchant.id ? `<a class="btn btn-outline btn-sm" href="/page/merchant/${order.merchant.id}">进入店铺</a>` : '未知'}</span>
-                        </div>
+                        ${currentType === 'buy' ? `
+                            <div class="detail-row">
+                                <span class="detail-label">商家</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.username ? order.merchant.username : '未知')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家实名</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.real_name ? order.merchant.real_name : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家手机</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.phone ? order.merchant.phone : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家邮箱</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.email ? order.merchant.email : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家地址</span>
+                                <span class="detail-value">${escapeHtml(order.merchant && order.merchant.address ? order.merchant.address : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">商家店铺</span>
+                                <span class="detail-value">${order.merchant && order.merchant.id ? `<a class="btn btn-outline btn-sm" href="/page/merchant/${order.merchant.id}">进入店铺</a>` : '未知'}</span>
+                            </div>
+                        ` : `
+                            <div class="detail-row">
+                                <span class="detail-label">买家</span>
+                                <span class="detail-value">${escapeHtml(order.buyer && order.buyer.username ? order.buyer.username : '未知')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">买家实名</span>
+                                <span class="detail-value">${escapeHtml(order.buyer && order.buyer.real_name ? order.buyer.real_name : '未填写')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">买家手机</span>
+                                <span class="detail-value">${escapeHtml(order.buyer && order.buyer.phone ? order.buyer.phone : '未填写')}</span>
+                            </div>
+                        `}
                         <div class="detail-row">
                             <span class="detail-label">商品单价</span>
                             <span class="detail-value">¥${order.price}</span>
@@ -475,6 +523,18 @@
                 loadOrders(currentStatus);
             } else {
                 showMessage(result.message || '取消失败', 'error');
+            }
+        }
+
+        async function shipOrder(orderId) {
+            if (!confirm('确认发货吗？')) return;
+
+            const result = await apiPut(`/order/${orderId}/status`, { status: 'shipped' });
+            if (result.code === 200) {
+                showMessage('发货成功');
+                loadOrders(currentStatus);
+            } else {
+                showMessage(result.message || '发货失败', 'error');
             }
         }
 

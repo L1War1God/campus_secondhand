@@ -16,6 +16,6 @@ with app.app_context():
     zhangsan_products = Product.query.filter_by(user_id=2).count()
     lisi_products = Product.query.filter_by(user_id=3).count()
     
-    print(f'\n修改完成!')
+    print(f'\n修改完成！')
     print(f'普通用户(zhangsan)的商品数量: {zhangsan_products}')
     print(f'商家(lisi)的商品数量: {lisi_products}')

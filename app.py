@@ -1,10 +1,11 @@
-from flask import Flask, jsonify, request, render_template
+﻿from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import text
 import json
 import hashlib
 import uuid
+from datetime import datetime
 
 # 创建 Flask 应用
 app = Flask(__name__)
@@ -119,8 +120,8 @@ class User(db.Model):
     address = db.Column(db.String(500))
     role = db.Column(db.String(20), default='user')
     status = db.Column(db.String(20), default='active')
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
 class Product(db.Model):
     __tablename__ = 'product'
@@ -139,8 +140,8 @@ class Product(db.Model):
     sales = db.Column(db.Integer, default=0)
     rating = db.Column(db.Numeric(2, 1), default=5.0)
     rating_count = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
 class Category(db.Model):
     __tablename__ = 'category'
@@ -165,8 +166,8 @@ class Order(db.Model):
     receiver_address = db.Column(db.String(500))
     payment_method = db.Column(db.String(20))
     remark = db.Column(db.String(500))
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
 class Cart(db.Model):
     __tablename__ = 'cart'
@@ -174,14 +175,14 @@ class Cart(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     product_id = db.Column(db.Integer, nullable=False)
     quantity = db.Column(db.Integer, default=1)
-    added_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    added_at = db.Column(db.DateTime, default=datetime.now)
 
 class Favorite(db.Model):
     __tablename__ = 'favorite'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     product_id = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 class Address(db.Model):
     __tablename__ = 'address'
@@ -192,7 +193,7 @@ class Address(db.Model):
     campus_area = db.Column(db.String(100))
     detail_address = db.Column(db.String(255), nullable=False)
     is_default = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 class SystemLog(db.Model):
     __tablename__ = 'system_log'
@@ -202,7 +203,7 @@ class SystemLog(db.Model):
     target = db.Column(db.String(200))
     ip_address = db.Column(db.String(45))
     details = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 # =====================================================
 # API 接口
@@ -686,7 +687,7 @@ def delete_user(id):
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
-    """获取商品分类(支持多级嵌套)"""
+    """获取商品分类（支持多级嵌套）"""
     try:
         if Category.query.count() == 0:
             seed_default_categories()
@@ -714,7 +715,7 @@ def get_categories():
 def build_category_children(parent_id, category_map):
     """递归构建分类子节点"""
     children = []
-    # 在实际应用中,可能需要按sort_order排序
+    # 在实际应用中，可能需要按sort_order排序
     for category_id, category in category_map.items():
         if category.parent_id == parent_id:
             children.append({
@@ -832,7 +833,7 @@ def admin_get_users():
         if role:
             query = query.filter(User.role == role)
         
-        # 排除管理员用户(可选,这里保留显示所有用户)
+        # 排除管理员用户（可选，这里保留显示所有用户）
         paginated = query.order_by(User.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
         result = []
@@ -899,7 +900,7 @@ def admin_unfreeze_user(id):
 
 @app.route('/api/admin/user/<int:id>', methods=['DELETE'])
 def admin_delete_user(id):
-    """删除用户账户(硬删除)"""
+    """删除用户账户（硬删除）"""
     try:
         user = User.query.get(id)
         if not user:
@@ -1206,15 +1207,26 @@ def get_orders():
     """获取用户订单"""
     try:
         user_id = request.args.get('user_id', type=int)
+        order_type = request.args.get('type', 'buy')
         status = request.args.get('status')
         if not user_id:
             return jsonify({'code': 400, 'message': 'user_id 参数缺失'})
         
-        query = db.session.query(Order, Product, User).outerjoin(
+        Buyer = db.aliased(User)
+        Seller = db.aliased(User)
+        
+        query = db.session.query(Order, Product, Buyer, Seller).outerjoin(
             Product, Order.product_id == Product.id
         ).outerjoin(
-            User, Order.merchant_id == User.id
-        ).filter(Order.user_id == user_id)
+            Buyer, Order.user_id == Buyer.id
+        ).outerjoin(
+            Seller, Order.merchant_id == Seller.id
+        )
+        
+        if order_type == 'sell':
+            query = query.filter(Order.merchant_id == user_id)
+        else:
+            query = query.filter(Order.user_id == user_id)
         
         if status:
             query = query.filter(Order.status == status)
@@ -1222,19 +1234,28 @@ def get_orders():
         orders = query.order_by(Order.created_at.desc()).all()
         
         result = []
-        for order, product, merchant in orders:
+        for order, product, buyer, seller in orders:
             merchant_payload = None
-            if merchant:
+            buyer_payload = None
+            if seller:
                 merchant_payload = {
-                    'id': merchant.id,
-                    'username': merchant.username,
-                    'real_name': merchant.real_name,
-                    'student_id': merchant.student_id,
-                    'phone': merchant.phone,
-                    'email': merchant.email,
-                    'address': merchant.address,
-                    'role': merchant.role,
-                    'status': merchant.status,
+                    'id': seller.id,
+                    'username': seller.username,
+                    'real_name': seller.real_name,
+                    'student_id': seller.student_id,
+                    'phone': seller.phone,
+                    'email': seller.email,
+                    'address': seller.address,
+                    'role': seller.role,
+                    'status': seller.status,
+                }
+            if buyer:
+                buyer_payload = {
+                    'id': buyer.id,
+                    'username': buyer.username,
+                    'real_name': buyer.real_name,
+                    'phone': buyer.phone,
+                    'address': buyer.address,
                 }
             
             # 处理商品已被删除的情况
@@ -1255,8 +1276,10 @@ def get_orders():
                 'receiver_phone': order.receiver_phone,
                 'receiver_address': order.receiver_address,
                 'payment_method': order.payment_method,
+                'user_id': order.user_id,
                 'merchant_id': order.merchant_id,
                 'merchant': merchant_payload,
+                'buyer': buyer_payload,
                 'image': image,
                 'created_at': order.created_at.strftime('%Y-%m-%d %H:%M:%S') if order.created_at else None
             })
@@ -1269,31 +1292,46 @@ def get_orders():
 def get_order(id):
     """获取订单详情"""
     try:
-        order = db.session.query(Order, Product, User).outerjoin(
+        Buyer = db.aliased(User)
+        Seller = db.aliased(User)
+        
+        order = db.session.query(Order, Product, Buyer, Seller).outerjoin(
             Product, Order.product_id == Product.id
         ).outerjoin(
-            User, Order.merchant_id == User.id
+            Buyer, Order.user_id == Buyer.id
+        ).outerjoin(
+            Seller, Order.merchant_id == Seller.id
         ).filter(Order.id == id).first()
         
         if not order:
             return jsonify({'code': 404, 'message': '订单不存在'})
         
-        order_data, product, merchant = order
+        order_data, product, buyer, seller = order
 
         merchant_payload = None
-        if merchant:
+        if seller:
             merchant_payload = {
-                'id': merchant.id,
-                'username': merchant.username,
-                'real_name': merchant.real_name,
-                'student_id': merchant.student_id,
-                'phone': merchant.phone,
-                'email': merchant.email,
-                'address': merchant.address,
-                'role': merchant.role,
-                'status': merchant.status,
+                'id': seller.id,
+                'username': seller.username,
+                'real_name': seller.real_name,
+                'student_id': seller.student_id,
+                'phone': seller.phone,
+                'email': seller.email,
+                'address': seller.address,
+                'role': seller.role,
+                'status': seller.status,
             }
-        
+
+        buyer_payload = None
+        if buyer:
+            buyer_payload = {
+                'id': buyer.id,
+                'username': buyer.username,
+                'real_name': buyer.real_name,
+                'phone': buyer.phone,
+                'address': buyer.address,
+            }
+
         # 处理商品已被删除的情况
         product_title = product.title if product else '商品已删除'
         price = float(product.price) if product else 0.0
@@ -1312,8 +1350,10 @@ def get_order(id):
             'receiver_phone': order_data.receiver_phone,
             'receiver_address': order_data.receiver_address,
             'payment_method': order_data.payment_method,
+            'user_id': order_data.user_id,
             'merchant_id': order_data.merchant_id,
             'merchant': merchant_payload,
+            'buyer': buyer_payload,
             'image': image,
             'created_at': order_data.created_at.strftime('%Y-%m-%d %H:%M:%S') if order_data.created_at else None
         }})

@@ -25,7 +25,7 @@ with app.app_context():
     db.session.add_all(categories)
     db.session.commit()
     
-    # 插入用户数据(密码: 123456 MD5)
+    # 插入用户数据（密码: 123456 MD5）
     users = [
         User(username='admin', password='e10adc3949ba59abbe56e057f20f883e', 
              real_name='管理员', student_id='20230001', phone='13800000000', 
@@ -42,31 +42,26 @@ with app.app_context():
     
     # 插入商品数据
     products = [
-        Product(user_id=2, category_id=10, title='九成新高数教材', 
-                description='高等数学第七版上册,几乎全新,无笔记', 
-                price=25.00, condition='like_new', status='on_sale',
-                stock=1, rating=4.8, rating_count=12),
-        Product(user_id=2, category_id=8, title='MacBook Pro 2020', 
-                description='13寸,i5,8+256,无维修', 
-                price=4500.00, condition='good', status='on_sale',
-                stock=1, rating=4.5, rating_count=5),
+        Product(user_id=2, category_id=8, title='九成新高数教材', 
+                description='高等数学第七版上册，几乎全新，无笔记', 
+                price=25.00, condition='like_new', status='on_sale'),
+        Product(user_id=2, category_id=9, title='MacBook Pro 2020', 
+                description='13寸，i5，8+256，无维修', 
+                price=4500.00, condition='good', status='on_sale'),
         Product(user_id=3, category_id=12, title='宿舍小风扇', 
-                description='USB充电,三档调节,很安静', 
-                price=35.00, condition='like_new', status='on_sale',
-                stock=3, rating=4.9, rating_count=28),
-        Product(user_id=2, category_id=9, title='索尼WH-1000XM4', 
-                description='降噪耳机,九成新,包装齐全', 
-                price=1200.00, condition='like_new', status='on_sale',
-                stock=1, rating=4.7, rating_count=15),
+                description='USB充电，三档调节，很安静', 
+                price=35.00, condition='like_new', status='on_sale'),
+        Product(user_id=2, category_id=10, title='索尼WH-1000XM4', 
+                description='降噪耳机，九成新，包装齐全', 
+                price=1200.00, condition='like_new', status='on_sale'),
         Product(user_id=3, category_id=13, title='台灯', 
-                description='LED护眼台灯,三档色温', 
-                price=45.00, condition='good', status='on_sale',
-                stock=2, rating=4.6, rating_count=8),
+                description='LED护眼台灯，三档色温', 
+                price=45.00, condition='good', status='on_sale'),
     ]
     db.session.add_all(products)
     db.session.commit()
     
-    print('数据库初始化完成!')
+    print('数据库初始化完成！')
     print(f'创建了 {len(categories)} 个分类')
     print(f'创建了 {len(users)} 个用户')
     print(f'创建了 {len(products)} 个商品')
