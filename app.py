@@ -11,9 +11,7 @@ app = Flask(__name__)
 CORS(app)  # 允许跨域请求(方便前后端分离开发)
 
 # 数据库配置(SQLite,无需额外安装数据库)
-import os
-db_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'instance', 'campus_secondhand.db'))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///campus_secondhand.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
