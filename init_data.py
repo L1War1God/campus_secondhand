@@ -42,16 +42,16 @@ with app.app_context():
     
     # 插入商品数据
     products = [
-        Product(user_id=2, category_id=8, title='九成新高数教材', 
+        Product(user_id=2, category_id=10, title='九成新高数教材', 
                 description='高等数学第七版上册,几乎全新,无笔记', 
                 price=25.00, condition='like_new', status='on_sale'),
-        Product(user_id=2, category_id=9, title='MacBook Pro 2020', 
+        Product(user_id=2, category_id=8, title='MacBook Pro 2020', 
                 description='13寸,i5,8+256,无维修', 
                 price=4500.00, condition='good', status='on_sale'),
         Product(user_id=3, category_id=12, title='宿舍小风扇', 
                 description='USB充电,三档调节,很安静', 
                 price=35.00, condition='like_new', status='on_sale'),
-        Product(user_id=2, category_id=10, title='索尼WH-1000XM4', 
+        Product(user_id=2, category_id=9, title='索尼WH-1000XM4', 
                 description='降噪耳机,九成新,包装齐全', 
                 price=1200.00, condition='like_new', status='on_sale'),
         Product(user_id=3, category_id=13, title='台灯', 
